@@ -1,0 +1,35 @@
+name: last
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  cloud_firestore: ^6.1.0
+  dropdown_button2: ^2.3.9
+  firebase_core: ^4.2.1
+  flutter:
+    sdk: flutter
+  intl: ^0.20.2
+  pdf: ^3.11.3
+  printing: ^5.14.2
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+
+  # هنا قسم الأصول والخطوط
+  assets:
+    - assets/fonts/Amiri/Amiri-Regular.ttf
+
+  fonts:
+    - family: Amiri
+      fonts:
+        - asset: assets/fonts/Amiri/Amiri-Regular.ttf
