@@ -9,6 +9,7 @@ import 'package:last/screens/1section/month_history.dart';
 import 'package:last/screens/3section/Taxes_page.dart';
 import 'package:last/screens/3section/company_partners.dart';
 import 'package:last/screens/3section/kazna/kazna_home.dart';
+import 'package:last/screens/3section/mony_head.dart';
 import 'package:last/screens/3section/nasriat.dart';
 import 'screens/1section/company.dart';
 import 'screens/1section/prices.dart';
@@ -58,7 +59,10 @@ class _MainDashboardState extends State<MainDashboard> {
     ExpensesPage(), // النثرسات
     MainTreasuryPage(), // الضرائب
     TaxesPage(), // الملخص الشهري
-    CompanyCapitalPage(), // الدائنون والمدينون
+    MonthlyProfitsPage(),
+    CapitalManagementPage(),
+
+    // الدائنون والمدينون
   ];
 
   final List<String> _pageTitles = [
@@ -73,8 +77,9 @@ class _MainDashboardState extends State<MainDashboard> {
     'الخزينة',
     'الضرائب',
 
-    // 'الدائنون والمدينون',
-    'رأس مال الشركة',
+    'الارباج  ',
+
+    'راس مال الشركه ',
   ];
 
   final List<IconData> _pageIcons = [
@@ -90,6 +95,7 @@ class _MainDashboardState extends State<MainDashboard> {
     Icons.assessment,
     Icons.summarize,
     Icons.swap_horiz,
+    Icons.money,
   ];
 
   // للتحكم في فتح وإغلاق الـ drawer في الشاشات الصغيرة

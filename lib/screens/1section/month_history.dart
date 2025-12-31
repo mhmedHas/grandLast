@@ -5403,7 +5403,7 @@ class _MonthlyRecordPageState extends State<MonthlyRecordPage> {
             child: SingleChildScrollView(
               scrollDirection: Axis.vertical,
               child: Table(
-                defaultColumnWidth: FixedColumnWidth(isMobile ? 120 : 150),
+                defaultColumnWidth: FixedColumnWidth(isMobile ? 110 : 130),
                 border: TableBorder.all(
                   color: const Color(0xFF3498DB),
                   width: 1,
