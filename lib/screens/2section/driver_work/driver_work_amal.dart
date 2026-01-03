@@ -12,244 +12,143 @@
 
 // // class _DriverWorkPageState extends State<DriverWorkPage> {
 // //   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-// //   List<Map<String, dynamic>> _allDrivers = [];
-// //   List<Map<String, dynamic>> _filteredDrivers = [];
+
+// //   // البيانات الأساسية
+// //   List<String> _contractors = []; // قائمة المقاولين
+// //   List<Map<String, dynamic>> _driversByContractor = []; // السائقين حسب المقاول
+
+// //   // بيانات شغل السائق (من الكود القديم)
 // //   List<Map<String, dynamic>> _driverWork = [];
 // //   List<Map<String, dynamic>> _filteredDriverWork = [];
-// //   String? _selectedDriver;
-// //   bool _isLoading = false;
-// //   String _searchQuery = '';
-// //   String _driverSearchQuery = '';
 
+// //   // حالات التحديد
+// //   String? _selectedContractor;
+// //   String? _selectedDriver;
+
+// //   // حالات التحميل
+// //   bool _isLoading = false;
+// //   bool _isLoadingDrivers = false;
+// //   bool _isLoadingWork = false;
+
+// //   // الفلاتر
+// //   String _searchContractorQuery = '';
+// //   String _searchDriverQuery = '';
+// //   String _timeFilter = 'الكل';
 // //   int _selectedMonth = DateTime.now().month;
 // //   int _selectedYear = DateTime.now().year;
-// //   String _timeFilter = 'الكل';
 
 // //   @override
 // //   void initState() {
 // //     super.initState();
-// //     _loadAllDriverData();
-// //     rebuildDriverSummariesNolonOnly();
+// //     _loadContractors();
 // //   }
 
 // //   // ---------------------------
-// //   // تحميل بيانات السائقين
+// //   // تحميل قائمة المقاولين
 // //   // ---------------------------
-// //   Future<void> _loadAllDriverData() async {
+// //   Future<void> _loadContractors() async {
 // //     setState(() => _isLoading = true);
 // //     try {
-// //       final driversSnapshot = await _firestore.collection('drivers').get();
+// //       final snapshot = await _firestore.collection('drivers').get();
 
-// //       Map<String, List<Map<String, dynamic>>> driverTrips = {};
+// //       // استخراج المقاولين الفريدين
+// //       Set<String> contractorsSet = {};
 
-// //       for (final doc in driversSnapshot.docs) {
+// //       for (final doc in snapshot.docs) {
 // //         final data = doc.data();
-// //         final driverName = (data['driverName'] ?? '').toString().trim();
-// //         if (driverName.isEmpty) continue;
-
-// //         if (!driverTrips.containsKey(driverName)) {
-// //           driverTrips[driverName] = [];
+// //         final contractor = (data['contractor'] ?? '').toString().trim();
+// //         if (contractor.isNotEmpty) {
+// //           contractorsSet.add(contractor);
 // //         }
-
-// //         final tripDate = (data['date'] as Timestamp?)?.toDate();
-
-// //         driverTrips[driverName]!.add({
-// //           'id': doc.id,
-// //           'date': tripDate,
-// //           'driverName': driverName,
-// //           'wheelNolon': (data['wheelNolon'] ?? 0).toDouble(),
-// //           'wheelOvernight': (data['wheelOvernight'] ?? 0).toDouble(),
-// //           'wheelHoliday': (data['wheelHoliday'] ?? 0).toDouble(),
-// //           'selectedPrice': (data['selectedPrice'] ?? 0).toDouble(),
-// //           'karta': data['karta'] ?? '',
-// //           'ohda': data['ohda'] ?? '',
-// //           'isPaid': data['isPaid'] ?? false,
-// //           'paidAmount': (data['paidAmount'] ?? 0).toDouble(),
-// //           'selectedRoute': data['selectedRoute'] ?? '',
-// //         });
 // //       }
 
-// //       final List<Map<String, dynamic>> driversList = [];
-
-// //       for (var entry in driverTrips.entries) {
-// //         final driverName = entry.key;
-// //         final trips = entry.value;
-// //         final filteredTrips = _filterTripsByDate(trips);
-
-// //         driversList.add({
-// //           'driverName': driverName,
-// //           'allTrips': trips,
-// //           'filteredTrips': filteredTrips,
-// //           'hasTripsInFilter': filteredTrips.isNotEmpty,
-// //           'totalTrips': trips.length,
-// //           'filteredTripsCount': filteredTrips.length,
-// //         });
-// //       }
+// //       // تحويل إلى قائمة وترتيب أبجدي
+// //       List<String> contractorsList = contractorsSet.toList()..sort();
 
 // //       setState(() {
-// //         _allDrivers = driversList;
-// //         _filteredDrivers = _applySearchFilter(driversList);
+// //         _contractors = contractorsList;
 // //         _isLoading = false;
 // //       });
 // //     } catch (e) {
 // //       setState(() => _isLoading = false);
-// //       _showError('خطأ في تحميل بيانات السائقين: $e');
+// //       _showError('خطأ في تحميل المقاولين: $e');
 // //     }
 // //   }
 
-// //   List<Map<String, dynamic>> _filterTripsByDate(
-// //     List<Map<String, dynamic>> trips,
-// //   ) {
-// //     if (_timeFilter == 'الكل') return trips;
-// //     return trips.where((trip) {
-// //       final tripDate = trip['date'] as DateTime?;
-// //       if (tripDate == null) return false;
-// //       final now = DateTime.now();
-// //       switch (_timeFilter) {
-// //         case 'اليوم':
-// //           return tripDate.year == now.year &&
-// //               tripDate.month == now.month &&
-// //               tripDate.day == now.day;
-// //         case 'هذا الشهر':
-// //           return tripDate.year == now.year && tripDate.month == now.month;
-// //         case 'هذه السنة':
-// //           return tripDate.year == now.year;
-// //         case 'مخصص':
-// //           return tripDate.year == _selectedYear &&
-// //               tripDate.month == _selectedMonth;
-// //         default:
-// //           return true;
-// //       }
-// //     }).toList();
-// //   }
+// //   // ---------------------------
+// //   // تحميل السائقين التابعين لمقاول محدد
+// //   // ---------------------------
+// //   Future<void> _loadDriversByContractor(String contractor) async {
+// //     if (contractor.isEmpty) return;
 
-// //   List<Map<String, dynamic>> _applySearchFilter(
-// //     List<Map<String, dynamic>> drivers,
-// //   ) {
-// //     if (_searchQuery.isEmpty) return drivers;
-// //     return drivers
-// //         .where(
-// //           (d) => d['driverName'].toLowerCase().contains(
-// //             _searchQuery.toLowerCase(),
-// //           ),
-// //         )
-// //         .toList();
-// //   }
-
-// //   void _updateFilter() {
 // //     setState(() {
-// //       for (var driver in _allDrivers) {
-// //         driver['filteredTrips'] = _filterTripsByDate(driver['allTrips']);
-// //         driver['hasTripsInFilter'] = driver['filteredTrips'].isNotEmpty;
-// //         driver['filteredTripsCount'] = driver['filteredTrips'].length;
-// //       }
-// //       _filteredDrivers = _applySearchFilter(_allDrivers);
+// //       _selectedContractor = contractor;
+// //       _isLoadingDrivers = true;
+// //       _driversByContractor.clear();
+// //       _selectedDriver = null;
+// //       _driverWork.clear();
+// //       _filteredDriverWork.clear();
 // //     });
-// //   }
 
-// //   void _changeTimeFilter(String filter) {
-// //     setState(() => _timeFilter = filter);
-// //     _updateFilter();
-// //   }
-
-// //   void _applyMonthYearFilter() {
-// //     setState(() => _timeFilter = 'مخصص');
-// //     _updateFilter();
-// //   }
-
-// //   // ---------------------------
-// //   // إعادة بناء ملخص النولون فقط
-// //   // ---------------------------
-// //   Future<void> rebuildDriverSummariesNolonOnly() async {
 // //     try {
-// //       final snapshot = await _firestore.collection('drivers').get();
-// //       Map<String, Map<String, dynamic>> driverSummaries = {};
+// //       final snapshot = await _firestore
+// //           .collection('drivers')
+// //           .where('contractor', isEqualTo: contractor)
+// //           .get();
+
+// //       // تجميع السائقين الفريدين
+// //       Map<String, Map<String, dynamic>> driversMap = {};
 
 // //       for (final doc in snapshot.docs) {
 // //         final data = doc.data();
 // //         final driverName = (data['driverName'] ?? '').toString().trim();
 // //         if (driverName.isEmpty) continue;
 
-// //         if (!driverSummaries.containsKey(driverName)) {
-// //           driverSummaries[driverName] = {
+// //         if (!driversMap.containsKey(driverName)) {
+// //           driversMap[driverName] = {
 // //             'driverName': driverName,
-// //             'totalWheelNolon': 0.0,
-// //             'totalPaidAmount': 0.0,
-// //             'totalRemainingAmount': 0.0,
+// //             'contractor': contractor,
 // //             'totalTrips': 0,
-// //             'lastUpdated': Timestamp.now(),
-// //             'status': 'جارية',
+// //             'lastTripDate': null,
 // //           };
 // //         }
 
-// //         final summary = driverSummaries[driverName]!;
+// //         final driverData = driversMap[driverName]!;
 
-// //         summary['totalWheelNolon'] =
-// //             (summary['totalWheelNolon'] ?? 0.0) +
-// //             ((data['wheelNolon'] ?? 0).toDouble() +
-// //                 (data['wheelOvernight'] ?? 0).toDouble() +
-// //                 (data['wheelHoliday'] ?? 0).toDouble());
-// //         summary['totalPaidAmount'] =
-// //             (summary['totalPaidAmount'] ?? 0.0) +
-// //             (data['paidAmount'] ?? 0).toDouble();
-// //         summary['totalTrips'] = (summary['totalTrips'] ?? 0) + 1;
+// //         // تحديث الإحصائيات
+// //         driverData['totalTrips'] = driverData['totalTrips']! + 1;
+
+// //         // تاريخ آخر رحلة
+// //         final tripDate = (data['date'] as Timestamp?)?.toDate();
+// //         if (tripDate != null) {
+// //           if (driverData['lastTripDate'] == null ||
+// //               tripDate.isAfter(driverData['lastTripDate'])) {
+// //             driverData['lastTripDate'] = tripDate;
+// //           }
+// //         }
 // //       }
 
-// //       for (var s in driverSummaries.values) {
-// //         final totalWheelNolon = (s['totalWheelNolon'] ?? 0.0).toDouble();
-// //         final totalPaid = (s['totalPaidAmount'] ?? 0.0).toDouble();
-// //         s['totalRemainingAmount'] = totalWheelNolon - totalPaid;
-// //         s['status'] = s['totalRemainingAmount'] <= 0 ? 'منتهية' : 'جارية';
-// //         s['lastUpdated'] = Timestamp.now();
-// //       }
+// //       // تحويل القائمة وترتيب أبجدي
+// //       List<Map<String, dynamic>> driversList = driversMap.values.toList();
+// //       driversList.sort((a, b) => a['driverName'].compareTo(b['driverName']));
 
-// //       final batch = _firestore.batch();
-// //       final summariesCollection = _firestore.collection('driverSummaries');
-
-// //       final old = await summariesCollection.get();
-// //       for (final d in old.docs) {
-// //         batch.delete(d.reference);
-// //       }
-
-// //       driverSummaries.forEach((name, data) {
-// //         batch.set(summariesCollection.doc(name), data);
+// //       setState(() {
+// //         _driversByContractor = driversList;
+// //         _isLoadingDrivers = false;
 // //       });
-
-// //       await batch.commit();
-// //       debugPrint('✅ driverSummaries rebuilt (nolon-only).');
 // //     } catch (e) {
-// //       debugPrint('❌ error rebuilding driverSummaries: $e');
+// //       setState(() => _isLoadingDrivers = false);
+// //       _showError('خطأ في تحميل السائقين: $e');
 // //     }
 // //   }
 
 // //   // ---------------------------
-// //   // إضافة رحلة جديدة مع تحديث الحساب فوري
-// //   // ---------------------------
-// //   Future<void> _addNewTrip(Map<String, dynamic> tripData) async {
-// //     try {
-// //       await _firestore.collection('drivers').add(tripData);
-
-// //       // تحديث شغل السائق مباشرة إذا مفتوح
-// //       if (_selectedDriver == tripData['driverName']) {
-// //         await _loadDriverWork(_selectedDriver!);
-// //       }
-
-// //       // تحديث ملخص النولون
-// //       await rebuildDriverSummariesNolonOnly();
-
-// //       _showSuccess('تم إضافة الرحلة وتحديث الحساب.');
-// //     } catch (e) {
-// //       _showError('خطأ في إضافة الرحلة: $e');
-// //     }
-// //   }
-
-// //   // ---------------------------
-// //   // تحميل شغل سائق محدد
+// //   // تحميل شغل سائق محدد - من الكود القديم
 // //   // ---------------------------
 // //   Future<void> _loadDriverWork(String driverName) async {
 // //     setState(() {
 // //       _selectedDriver = driverName;
-// //       _isLoading = true;
+// //       _isLoadingWork = true;
 // //       _driverWork.clear();
 // //       _filteredDriverWork.clear();
 // //     });
@@ -291,14 +190,17 @@
 // //       setState(() {
 // //         _driverWork = workList;
 // //         _filteredDriverWork = _filterWorkByDate(workList);
-// //         _isLoading = false;
+// //         _isLoadingWork = false;
 // //       });
 // //     } catch (e) {
-// //       setState(() => _isLoading = false);
+// //       setState(() => _isLoadingWork = false);
 // //       _showError('خطأ في تحميل الشغل');
 // //     }
 // //   }
 
+// //   // ---------------------------
+// //   // تصفية الشغل حسب التاريخ - من الكود القديم
+// //   // ---------------------------
 // //   List<Map<String, dynamic>> _filterWorkByDate(
 // //     List<Map<String, dynamic>> workList,
 // //   ) {
@@ -325,15 +227,97 @@
 // //     }).toList();
 // //   }
 
+// //   // ---------------------------
+// //   // تصفية المقاولين حسب البحث
+// //   // ---------------------------
+// //   List<String> _getFilteredContractors() {
+// //     if (_searchContractorQuery.isEmpty) return _contractors;
+// //     return _contractors
+// //         .where(
+// //           (contractor) => contractor.toLowerCase().contains(
+// //             _searchContractorQuery.toLowerCase(),
+// //           ),
+// //         )
+// //         .toList();
+// //   }
+
+// //   // ---------------------------
+// //   // تصفية السائقين حسب البحث
+// //   // ---------------------------
+// //   List<Map<String, dynamic>> _getFilteredDrivers() {
+// //     if (_searchDriverQuery.isEmpty) return _driversByContractor;
+// //     return _driversByContractor
+// //         .where(
+// //           (driver) => driver['driverName'].toLowerCase().contains(
+// //             _searchDriverQuery.toLowerCase(),
+// //           ),
+// //         )
+// //         .toList();
+// //   }
+
+// //   // ---------------------------
+// //   // تغيير فلتر الوقت
+// //   // ---------------------------
+// //   void _changeTimeFilter(String filter) {
+// //     setState(() => _timeFilter = filter);
+// //     if (_selectedDriver != null) {
+// //       _filteredDriverWork = _filterWorkByDate(_driverWork);
+// //     }
+// //   }
+
+// //   // ---------------------------
+// //   // تطبيق فلتر الشهر والسنة
+// //   // ---------------------------
+// //   void _applyMonthYearFilter() {
+// //     setState(() => _timeFilter = 'مخصص');
+// //     if (_selectedDriver != null) {
+// //       _filteredDriverWork = _filterWorkByDate(_driverWork);
+// //     }
+// //   }
+
+// //   // ---------------------------
+// //   // العودة للخلف
+// //   // ---------------------------
+// //   void _goBack() {
+// //     if (_selectedDriver != null) {
+// //       // العودة لقائمة السائقين
+// //       setState(() {
+// //         _selectedDriver = null;
+// //         _driverWork.clear();
+// //         _filteredDriverWork.clear();
+// //       });
+// //     } else if (_selectedContractor != null) {
+// //       // العودة لقائمة المقاولين
+// //       setState(() {
+// //         _selectedContractor = null;
+// //         _selectedDriver = null;
+// //         _driversByContractor.clear();
+// //         _driverWork.clear();
+// //         _filteredDriverWork.clear();
+// //       });
+// //     }
+// //   }
+
+// //   // ---------------------------
+// //   // الرسائل
+// //   // ---------------------------
 // //   void _showError(String message) {
 // //     ScaffoldMessenger.of(context).showSnackBar(
-// //       SnackBar(content: Text(message), backgroundColor: Colors.red),
+// //       SnackBar(
+// //         content: Text(message),
+// //         backgroundColor: Colors.red,
+// //         duration: Duration(seconds: 3),
+// //       ),
 // //     );
 // //   }
 
 // //   void _showSuccess(String message) {
 // //     ScaffoldMessenger.of(context).showSnackBar(
-// //       SnackBar(content: Text(message), backgroundColor: Colors.green),
+// //       SnackBar(
+// //         content: Text(message),
+// //         backgroundColor: Colors.green,
+// //         duration: Duration(seconds: 2),
+// //       ),
 // //     );
 // //   }
 
@@ -342,7 +326,19 @@
 // //     return DateFormat('dd/MM/yyyy').format(date);
 // //   }
 
+// //   // ---------------------------
+// //   // AppBar
+// //   // ---------------------------
 // //   Widget _buildCustomAppBar() {
+// //     String title = 'شغل السائقين';
+
+// //     if (_selectedContractor != null) {
+// //       title = 'المقاول: $_selectedContractor';
+// //     }
+// //     if (_selectedDriver != null) {
+// //       title = 'السائق: $_selectedDriver';
+// //     }
+
 // //     return Container(
 // //       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
 // //       decoration: const BoxDecoration(
@@ -359,19 +355,28 @@
 // //         bottom: false,
 // //         child: Row(
 // //           children: [
+// //             // زر العودة إذا كان هناك اختيار
+// //             if (_selectedContractor != null || _selectedDriver != null)
+// //               IconButton(
+// //                 icon: Icon(Icons.arrow_back, color: Colors.white),
+// //                 onPressed: _goBack,
+// //               ),
+
 // //             Icon(Icons.people, color: Colors.white, size: 28),
 // //             SizedBox(width: 12),
-// //             Text(
-// //               _selectedDriver == null
-// //                   ? 'شغل السائقين'
-// //                   : '$_selectedDriverشغل السائق ',
-// //               style: const TextStyle(
-// //                 color: Colors.white,
-// //                 fontSize: 20,
-// //                 fontWeight: FontWeight.bold,
+// //             Expanded(
+// //               child: Text(
+// //                 title,
+// //                 style: const TextStyle(
+// //                   color: Colors.white,
+// //                   fontSize: 20,
+// //                   fontWeight: FontWeight.bold,
+// //                 ),
+// //                 overflow: TextOverflow.ellipsis,
 // //               ),
 // //             ),
-// //             const Spacer(),
+
+// //             // الوقت
 // //             StreamBuilder<DateTime>(
 // //               stream: Stream.periodic(
 // //                 const Duration(seconds: 1),
@@ -381,30 +386,17 @@
 // //                 final now = snapshot.data ?? DateTime.now();
 // //                 int hour12 = now.hour % 12;
 // //                 if (hour12 == 0) hour12 = 12;
-// //                 String period = now.hour < 12 ? 'AM' : 'PM';
 
-// //                 return Column(
-// //                   crossAxisAlignment: CrossAxisAlignment.center,
-// //                   children: [
-// //                     Container(
-// //                       height: 50,
-// //                       width: 150,
-// //                       decoration: BoxDecoration(
-// //                         color: Colors.transparent,
-// //                         borderRadius: BorderRadius.circular(16),
-// //                       ),
-// //                       child: Center(
-// //                         child: Text(
-// //                           '${hour12.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} ',
-// //                           style: const TextStyle(
-// //                             color: Colors.white,
-// //                             fontSize: 36,
-// //                             fontWeight: FontWeight.bold,
-// //                           ),
-// //                         ),
-// //                       ),
+// //                 return Container(
+// //                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+// //                   child: Text(
+// //                     '${hour12.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
+// //                     style: const TextStyle(
+// //                       color: Colors.white,
+// //                       fontSize: 18,
+// //                       fontWeight: FontWeight.bold,
 // //                     ),
-// //                   ],
+// //                   ),
 // //                 );
 // //               },
 // //             ),
@@ -415,190 +407,296 @@
 // //   }
 
 // //   // ---------------------------
-// //   // UI Build
+// //   // واجهة اختيار المقاولين
 // //   // ---------------------------
-// //   @override
-// //   Widget build(BuildContext context) {
-// //     return Scaffold(
-// //       backgroundColor: const Color(0xFFF4F6F8),
+// //   Widget _buildContractorsList() {
+// //     final filteredContractors = _getFilteredContractors();
 
-// //       body: Column(
-// //         children: [
-// //           // AppBar
-// //           _buildCustomAppBar(),
+// //     if (_isLoading) {
+// //       return const Center(
+// //         child: CircularProgressIndicator(
+// //           valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3498DB)),
+// //         ),
+// //       );
+// //     }
 
-// //           // Container(
-// //           //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-// //           //   decoration: const BoxDecoration(
-// //           //     gradient: LinearGradient(
-// //           //       begin: Alignment.centerRight,
-// //           //       end: Alignment.centerLeft,
-// //           //       colors: [Color(0xFF1B4F72), Color(0xFF3498DB)],
-// //           //     ),
-// //           //     boxShadow: [
-// //           //       BoxShadow(
-// //           //         color: Colors.black26,
-// //           //         blurRadius: 8,
-// //           //         offset: Offset(0, 2),
-// //           //       ),
-// //           //     ],
-// //           //   ),
-// //           //   child: SafeArea(
-// //           //     child: Row(
-// //           //       children: [
-// //           //         const Icon(Icons.person, color: Colors.white, size: 28),
-// //           //         const SizedBox(width: 8),
-// //           //         Expanded(
-// //           //           child:
-// //           //         ),
-// //           //         if (_selectedDriver != null)
-// //           //           IconButton(
-// //           //             icon: const Icon(Icons.arrow_back, color: Colors.white),
-// //           //             onPressed: () {
-// //           //               setState(() {
-// //           //                 _selectedDriver = null;
-// //           //                 _driverWork.clear();
-// //           //                 _filteredDriverWork.clear();
-// //           //               });
-// //           //               _loadAllDriverData();
-// //           //             },
-// //           //           ),
-// //           //       ],
-// //           //     ),
-// //           //   ),
-// //           // ),
-// //           if (_selectedDriver == null) _buildTimeFilterSection(),
-
-// //           Expanded(
-// //             child: _selectedDriver == null
-// //                 ? _buildDriverList()
-// //                 : _buildWorkTable(),
-// //           ),
-// //         ],
-// //       ),
-// //       // floatingActionButton: FloatingActionButton(
-// //       //   onPressed: () async {
-// //       //     await _loadAllDriverData();
-// //       //     await rebuildDriverSummariesNolonOnly();
-// //       //   },
-// //       //   backgroundColor: const Color(0xFF3498DB),
-// //       //   child: const Icon(Icons.refresh, color: Colors.white),
-// //       //   tooltip: 'تحديث',
-// //       // ),
-// //     );
-// //   }
-
-// //   Widget _buildDriverList() {
-// //     if (_isLoading) return const Center(child: CircularProgressIndicator());
-
-// //     final driversWithTrips = _filteredDrivers
-// //         .where((d) => d['hasTripsInFilter'])
-// //         .toList();
-// //     final driversWithoutTrips = _filteredDrivers
-// //         .where((d) => !d['hasTripsInFilter'])
-// //         .toList();
-
-// //     return ListView(
-// //       padding: const EdgeInsets.all(8),
+// //     return Column(
 // //       children: [
-// //         ...driversWithTrips.map((driver) => _buildDriverCard(driver)),
-// //         if (driversWithTrips.isEmpty && driversWithoutTrips.isNotEmpty)
-// //           Container(
-// //             margin: const EdgeInsets.all(16),
-// //             padding: const EdgeInsets.all(20),
-// //             decoration: BoxDecoration(
-// //               color: Colors.white,
-// //               borderRadius: BorderRadius.circular(12),
-// //               border: Border.all(color: Colors.grey[300]!),
+// //         // حقل البحث
+// //         Container(
+// //           padding: EdgeInsets.all(16),
+// //           child: TextField(
+// //             decoration: InputDecoration(
+// //               hintText: 'ابحث عن مقاول...',
+// //               prefixIcon: Icon(Icons.search, color: Color(0xFF3498DB)),
+// //               border: OutlineInputBorder(
+// //                 borderRadius: BorderRadius.circular(12),
+// //                 borderSide: BorderSide(color: Color(0xFF3498DB)),
+// //               ),
+// //               filled: true,
+// //               fillColor: Colors.white,
+// //               contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
 // //             ),
-// //             child: Column(
-// //               children: [
-// //                 Icon(Icons.calendar_today, size: 60, color: Colors.grey[400]),
-// //                 const SizedBox(height: 16),
-// //                 Text(
-// //                   _timeFilter == 'مخصص'
-// //                       ? 'لا توجد رحلات في شهر $_selectedMonth سنة $_selectedYear'
-// //                       : 'لا توجد رحلات في الفترة المحددة',
-// //                   style: const TextStyle(
-// //                     fontSize: 16,
-// //                     color: Colors.grey,
-// //                     fontWeight: FontWeight.bold,
-// //                   ),
-// //                   textAlign: TextAlign.center,
-// //                 ),
-// //                 const SizedBox(height: 8),
-// //                 const Text(
-// //                   'اختر فترة زمنية مختلفة',
-// //                   style: TextStyle(fontSize: 14, color: Colors.grey),
-// //                   textAlign: TextAlign.center,
-// //                 ),
-// //               ],
-// //             ),
+// //             onChanged: (value) {
+// //               setState(() {
+// //                 _searchContractorQuery = value;
+// //               });
+// //             },
 // //           ),
+// //         ),
+
+// //         // قائمة المقاولين
+// //         Expanded(
+// //           child: filteredContractors.isEmpty
+// //               ? Center(
+// //                   child: Column(
+// //                     mainAxisAlignment: MainAxisAlignment.center,
+// //                     children: [
+// //                       Icon(Icons.business, size: 60, color: Colors.grey),
+// //                       SizedBox(height: 16),
+// //                       Text(
+// //                         _searchContractorQuery.isEmpty
+// //                             ? 'لا يوجد مقاولين مسجلين'
+// //                             : 'لا توجد نتائج للبحث',
+// //                         style: TextStyle(color: Colors.grey, fontSize: 16),
+// //                       ),
+// //                     ],
+// //                   ),
+// //                 )
+// //               : ListView.builder(
+// //                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+// //                   itemCount: filteredContractors.length,
+// //                   itemBuilder: (context, index) {
+// //                     final contractor = filteredContractors[index];
+
+// //                     return Container(
+// //                       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+// //                       decoration: BoxDecoration(
+// //                         color: Colors.white,
+// //                         borderRadius: BorderRadius.circular(12),
+// //                         border: Border.all(
+// //                           color: Color(0xFF3498DB).withOpacity(0.3),
+// //                         ),
+// //                         boxShadow: [
+// //                           BoxShadow(
+// //                             color: Colors.black12,
+// //                             blurRadius: 4,
+// //                             offset: Offset(0, 2),
+// //                           ),
+// //                         ],
+// //                       ),
+// //                       child: ListTile(
+// //                         leading: Container(
+// //                           width: 50,
+// //                           height: 50,
+// //                           decoration: BoxDecoration(
+// //                             color: Color(0xFF3498DB),
+// //                             borderRadius: BorderRadius.circular(25),
+// //                           ),
+// //                           child: Center(
+// //                             child: Text(
+// //                               contractor.substring(0, 1).toUpperCase(),
+// //                               style: TextStyle(
+// //                                 color: Colors.white,
+// //                                 fontSize: 20,
+// //                                 fontWeight: FontWeight.bold,
+// //                               ),
+// //                             ),
+// //                           ),
+// //                         ),
+// //                         title: Text(
+// //                           contractor,
+// //                           style: TextStyle(
+// //                             fontWeight: FontWeight.bold,
+// //                             fontSize: 16,
+// //                             color: Color(0xFF2C3E50),
+// //                           ),
+// //                         ),
+// //                         subtitle: Text(
+// //                           'انقر لعرض السائقين',
+// //                           style: TextStyle(color: Colors.grey),
+// //                         ),
+// //                         trailing: Icon(
+// //                           Icons.arrow_forward_ios,
+// //                           color: Color(0xFF3498DB),
+// //                           size: 16,
+// //                         ),
+// //                         onTap: () => _loadDriversByContractor(contractor),
+// //                       ),
+// //                     );
+// //                   },
+// //                 ),
+// //         ),
 // //       ],
 // //     );
 // //   }
 
-// //   Widget _buildDriverCard(Map<String, dynamic> driver) {
-// //     final driverName = driver['driverName'];
-// //     final filteredTripsCount = driver['filteredTripsCount'];
-// //     final totalTrips = driver['totalTrips'];
-// //     final hasTrips = driver['hasTripsInFilter'];
+// //   // ---------------------------
+// //   // واجهة اختيار السائقين
+// //   // ---------------------------
+// //   Widget _buildDriversList() {
+// //     final filteredDrivers = _getFilteredDrivers();
 
-// //     return Container(
-// //       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-// //       decoration: BoxDecoration(
-// //         color: Colors.white,
-// //         borderRadius: BorderRadius.circular(12),
-// //         border: Border.all(
-// //           color: hasTrips
-// //               ? const Color(0xFF3498DB).withOpacity(0.3)
-// //               : Colors.grey.withOpacity(0.3),
+// //     if (_isLoadingDrivers) {
+// //       return const Center(
+// //         child: CircularProgressIndicator(
+// //           valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3498DB)),
 // //         ),
-// //       ),
-// //       child: ListTile(
-// //         leading: Container(
-// //           width: 45,
-// //           height: 45,
-// //           decoration: BoxDecoration(
-// //             color: hasTrips ? const Color(0xFF3498DB) : Colors.grey,
-// //             borderRadius: BorderRadius.circular(22.5),
-// //           ),
-// //           child: Center(
-// //             child: Text(
-// //               filteredTripsCount.toString(),
-// //               style: const TextStyle(
-// //                 color: Colors.white,
-// //                 fontWeight: FontWeight.bold,
-// //                 fontSize: 16,
+// //       );
+// //     }
+
+// //     return Column(
+// //       children: [
+// //         // شريط البحث
+// //         Container(
+// //           padding: EdgeInsets.all(16),
+// //           child: TextField(
+// //             decoration: InputDecoration(
+// //               hintText: 'ابحث عن سائق...',
+// //               prefixIcon: Icon(Icons.search, color: Color(0xFF3498DB)),
+// //               border: OutlineInputBorder(
+// //                 borderRadius: BorderRadius.circular(12),
+// //                 borderSide: BorderSide(color: Color(0xFF3498DB)),
 // //               ),
+// //               filled: true,
+// //               fillColor: Colors.white,
+// //               contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 16),
 // //             ),
+// //             onChanged: (value) {
+// //               setState(() {
+// //                 _searchDriverQuery = value;
+// //               });
+// //             },
 // //           ),
 // //         ),
-// //         title: Text(
-// //           driverName,
-// //           style: TextStyle(
-// //             fontWeight: FontWeight.bold,
-// //             fontSize: 16,
-// //             color: hasTrips ? const Color(0xFF2C3E50) : Colors.grey,
+
+// //         // معلومات المقاول
+// //         Container(
+// //           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+// //           child: Row(
+// //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// //             children: [
+// //               Text(
+// //                 'عدد السائقين: ${filteredDrivers.length}',
+// //                 style: TextStyle(
+// //                   color: Color(0xFF3498DB),
+// //                   fontWeight: FontWeight.bold,
+// //                 ),
+// //               ),
+// //               Container(
+// //                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+// //                 decoration: BoxDecoration(
+// //                   color: Color(0xFF3498DB).withOpacity(0.1),
+// //                   borderRadius: BorderRadius.circular(20),
+// //                 ),
+// //                 child: Text(
+// //                   'المقاول: $_selectedContractor',
+// //                   style: TextStyle(
+// //                     color: Color(0xFF3498DB),
+// //                     fontWeight: FontWeight.bold,
+// //                   ),
+// //                 ),
+// //               ),
+// //             ],
 // //           ),
 // //         ),
-// //         subtitle: Text(
-// //           'إجمالي الرحلات: $totalTrips',
-// //           style: const TextStyle(color: Colors.grey, fontSize: 12),
+
+// //         // قائمة السائقين
+// //         Expanded(
+// //           child: filteredDrivers.isEmpty
+// //               ? Center(
+// //                   child: Column(
+// //                     mainAxisAlignment: MainAxisAlignment.center,
+// //                     children: [
+// //                       Icon(Icons.person_off, size: 60, color: Colors.grey),
+// //                       SizedBox(height: 16),
+// //                       Text(
+// //                         _searchDriverQuery.isEmpty
+// //                             ? 'لا يوجد سائقين لهذا المقاول'
+// //                             : 'لا توجد نتائج للبحث',
+// //                         style: TextStyle(color: Colors.grey, fontSize: 16),
+// //                       ),
+// //                     ],
+// //                   ),
+// //                 )
+// //               : ListView.builder(
+// //                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+// //                   itemCount: filteredDrivers.length,
+// //                   itemBuilder: (context, index) {
+// //                     final driver = filteredDrivers[index];
+
+// //                     return Container(
+// //                       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+// //                       decoration: BoxDecoration(
+// //                         color: Colors.white,
+// //                         borderRadius: BorderRadius.circular(12),
+// //                         border: Border.all(color: Colors.grey[300]!),
+// //                         boxShadow: [
+// //                           BoxShadow(
+// //                             color: Colors.black12,
+// //                             blurRadius: 2,
+// //                             offset: Offset(0, 1),
+// //                           ),
+// //                         ],
+// //                       ),
+// //                       child: ListTile(
+// //                         leading: CircleAvatar(
+// //                           backgroundColor: Color(0xFF3498DB),
+// //                           child: Text(
+// //                             driver['driverName'].substring(0, 1).toUpperCase(),
+// //                             style: TextStyle(
+// //                               color: Colors.white,
+// //                               fontWeight: FontWeight.bold,
+// //                             ),
+// //                           ),
+// //                         ),
+// //                         title: Text(
+// //                           driver['driverName'],
+// //                           style: TextStyle(
+// //                             fontWeight: FontWeight.bold,
+// //                             fontSize: 16,
+// //                           ),
+// //                         ),
+// //                         subtitle: Column(
+// //                           crossAxisAlignment: CrossAxisAlignment.start,
+// //                           children: [
+// //                             SizedBox(height: 4),
+// //                             Row(
+// //                               children: [
+// //                                 Icon(
+// //                                   Icons.directions_car,
+// //                                   size: 14,
+// //                                   color: Colors.grey,
+// //                                 ),
+// //                                 SizedBox(width: 4),
+// //                                 Text(
+// //                                   '${driver['totalTrips']} رحلة',
+// //                                   style: TextStyle(fontSize: 12),
+// //                                 ),
+// //                               ],
+// //                             ),
+// //                           ],
+// //                         ),
+// //                         trailing: Icon(
+// //                           Icons.arrow_forward_ios,
+// //                           color: Color(0xFF3498DB),
+// //                           size: 16,
+// //                         ),
+// //                         onTap: () => _loadDriverWork(driver['driverName']),
+// //                       ),
+// //                     );
+// //                   },
+// //                 ),
 // //         ),
-// //         trailing: Icon(
-// //           Icons.arrow_forward_ios,
-// //           color: hasTrips ? const Color(0xFF3498DB) : Colors.grey,
-// //           size: 16,
-// //         ),
-// //         onTap: hasTrips ? () => _loadDriverWork(driverName) : null,
-// //       ),
+// //       ],
 // //     );
 // //   }
 
+// //   // ---------------------------
+// //   // واجهة جدول شغل السائق - من الكود القديم (بدون تغييرات)
+// //   // ---------------------------
 // //   Widget _buildWorkTable() {
-// //     if (_isLoading) return const Center(child: CircularProgressIndicator());
+// //     if (_isLoadingWork) return const Center(child: CircularProgressIndicator());
 
 // //     return Column(
 // //       children: [
@@ -733,7 +831,7 @@
 // //                                 TableCellBody('${index + 1}'),
 // //                               ],
 // //                             );
-// //                           }).toList(),
+// //                           }),
 // //                         ],
 // //                       ),
 // //                     ),
@@ -759,6 +857,9 @@
 // //     }
 // //   }
 
+// //   // ---------------------------
+// //   // قسم فلتر الوقت - من الكود القديم
+// //   // ---------------------------
 // //   Widget _buildTimeFilterSection() {
 // //     return Container(
 // //       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -779,42 +880,9 @@
 // //             ),
 // //             onChanged: (value) {
 // //               setState(() {
-// //                 _driverSearchQuery = value;
-// //                 _filteredDrivers = _allDrivers
-// //                     .where(
-// //                       (d) => d['driverName'].toLowerCase().contains(
-// //                         _driverSearchQuery.toLowerCase(),
-// //                       ),
-// //                     )
-// //                     .toList();
+// //                 _searchDriverQuery = value;
 // //               });
 // //             },
-// //           ),
-// //           const SizedBox(height: 12),
-// //           SingleChildScrollView(
-// //             scrollDirection: Axis.horizontal,
-// //             child: Row(
-// //               // children: ['الكل', 'اليوم', 'هذا الشهر', 'هذه السنة']
-// //               //     .map(
-// //               //       (filter) => Padding(
-// //               //         padding: const EdgeInsets.symmetric(horizontal: 4),
-// //               //         child: ChoiceChip(
-// //               //           label: Text(filter),
-// //               //           selected: _timeFilter == filter,
-// //               //           onSelected: (selected) {
-// //               //             if (selected) _changeTimeFilter(filter);
-// //               //           },
-// //               //           selectedColor: const Color(0xFF3498DB),
-// //               //           labelStyle: TextStyle(
-// //               //             color: _timeFilter == filter
-// //               //                 ? Colors.white
-// //               //                 : const Color(0xFF2C3E50),
-// //               //           ),
-// //               //         ),
-// //               //       ),
-// //               //     )
-// //               //     .toList(),
-// //             ),
 // //           ),
 // //           const SizedBox(height: 12),
 // //           Row(
@@ -859,6 +927,44 @@
 // //             ],
 // //           ),
 // //         ],
+// //       ),
+// //     );
+// //   }
+
+// //   // ---------------------------
+// //   // الواجهة الرئيسية
+// //   // ---------------------------
+// //   @override
+// //   Widget build(BuildContext context) {
+// //     return Scaffold(
+// //       backgroundColor: Color(0xFFF4F6F8),
+// //       body: Column(
+// //         children: [
+// //           _buildCustomAppBar(),
+// //           if (_selectedDriver == null && _selectedContractor == null)
+// //             _buildTimeFilterSection(),
+// //           Expanded(
+// //             child: _selectedDriver != null
+// //                 ? _buildWorkTable() // جدول شغل السائق (من الكود القديم)
+// //                 : (_selectedContractor != null
+// //                       ? _buildDriversList()
+// //                       : _buildContractorsList()),
+// //           ),
+// //         ],
+// //       ),
+// //       floatingActionButton: FloatingActionButton(
+// //         onPressed: () {
+// //           if (_selectedDriver != null) {
+// //             _loadDriverWork(_selectedDriver!);
+// //           } else if (_selectedContractor != null) {
+// //             _loadDriversByContractor(_selectedContractor!);
+// //           } else {
+// //             _loadContractors();
+// //           }
+// //         },
+// //         backgroundColor: Color(0xFF3498DB),
+// //         tooltip: 'تحديث',
+// //         child: Icon(Icons.refresh, color: Colors.white),
 // //       ),
 // //     );
 // //   }
@@ -911,6 +1017,10 @@
 // import 'package:cloud_firestore/cloud_firestore.dart';
 // import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
+// import 'package:pdf/pdf.dart';
+// import 'package:pdf/widgets.dart' as pdfLib;
+// import 'package:printing/printing.dart';
+// import 'package:flutter/services.dart';
 
 // class DriverWorkPage extends StatefulWidget {
 //   const DriverWorkPage({super.key});
@@ -925,8 +1035,10 @@
 //   // البيانات الأساسية
 //   List<String> _contractors = []; // قائمة المقاولين
 //   List<Map<String, dynamic>> _driversByContractor = []; // السائقين حسب المقاول
-//   List<Map<String, dynamic>> _driverWork = []; // شغل السائق المحدد
-//   List<Map<String, dynamic>> _filteredDriverWork = []; // شغل السائق المصفى
+
+//   // بيانات شغل السائق
+//   List<Map<String, dynamic>> _driverWork = [];
+//   List<Map<String, dynamic>> _filteredDriverWork = [];
 
 //   // حالات التحديد
 //   String? _selectedContractor;
@@ -936,6 +1048,7 @@
 //   bool _isLoading = false;
 //   bool _isLoadingDrivers = false;
 //   bool _isLoadingWork = false;
+//   bool _isGeneratingPDF = false;
 
 //   // الفلاتر
 //   String _searchContractorQuery = '';
@@ -944,10 +1057,26 @@
 //   int _selectedMonth = DateTime.now().month;
 //   int _selectedYear = DateTime.now().year;
 
+//   // للطباعة
+//   pdfLib.Font? _arabicFont;
+
 //   @override
 //   void initState() {
 //     super.initState();
 //     _loadContractors();
+//     _loadArabicFont();
+//   }
+
+//   // تحميل الخط العربي للطباعة
+//   Future<void> _loadArabicFont() async {
+//     try {
+//       final fontData = await rootBundle.load(
+//         'assets/fonts/Amiri/Amiri-Regular.ttf',
+//       );
+//       _arabicFont = pdfLib.Font.ttf(fontData);
+//     } catch (e) {
+//       debugPrint('فشل تحميل الخط العربي: $e');
+//     }
 //   }
 
 //   // ---------------------------
@@ -1016,8 +1145,6 @@
 //             'driverName': driverName,
 //             'contractor': contractor,
 //             'totalTrips': 0,
-//             'totalWheelNolon': 0.0,
-//             'totalPaid': 0.0,
 //             'lastTripDate': null,
 //           };
 //         }
@@ -1026,14 +1153,6 @@
 
 //         // تحديث الإحصائيات
 //         driverData['totalTrips'] = driverData['totalTrips']! + 1;
-//         driverData['totalWheelNolon'] =
-//             (driverData['totalWheelNolon'] ?? 0.0) +
-//             ((data['wheelNolon'] ?? 0).toDouble() +
-//                 (data['wheelOvernight'] ?? 0).toDouble() +
-//                 (data['wheelHoliday'] ?? 0).toDouble());
-//         driverData['totalPaid'] =
-//             (driverData['totalPaid'] ?? 0.0) +
-//             (data['paidAmount'] ?? 0).toDouble();
 
 //         // تاريخ آخر رحلة
 //         final tripDate = (data['date'] as Timestamp?)?.toDate();
@@ -1060,11 +1179,9 @@
 //   }
 
 //   // ---------------------------
-//   // تحميل شغل سائق محدد - الإصدار المعدل
+//   // تحميل شغل سائق محدد
 //   // ---------------------------
 //   Future<void> _loadDriverWork(String driverName) async {
-//     if (driverName.isEmpty || _selectedContractor == null) return;
-
 //     setState(() {
 //       _selectedDriver = driverName;
 //       _isLoadingWork = true;
@@ -1073,35 +1190,22 @@
 //     });
 
 //     try {
-//       print('جارٍ تحميل شغل السائق: $driverName');
-//       print('للمقاول: $_selectedContractor');
-
-//       // استعلام واحد فقط حسب اسم السائق (لأن المقاول قد لا يكون صحيحاً في البيانات القديمة)
 //       final snapshot = await _firestore
 //           .collection('drivers')
 //           .where('driverName', isEqualTo: driverName)
 //           .orderBy('date', descending: true)
 //           .get();
 
-//       print('تم العثور على ${snapshot.docs.length} مستند');
-
 //       List<Map<String, dynamic>> workList = [];
 
 //       for (final doc in snapshot.docs) {
 //         final data = doc.data();
-//         final docContractor = (data['contractor'] ?? '').toString().trim();
-//         final docDriverName = (data['driverName'] ?? '').toString().trim();
-
-//         // تحقق من أن السائق هو المطلوب
-//         if (docDriverName != driverName) continue;
-
 //         DateTime? date = (data['date'] as Timestamp?)?.toDate();
 
 //         workList.add({
 //           'id': doc.id,
 //           'date': date,
 //           'companyName': data['companyName'] ?? 'غير معروف',
-//           'companyId': data['companyId'] ?? '',
 //           'loadingLocation': data['loadingLocation'] ?? '',
 //           'unloadingLocation': data['unloadingLocation'] ?? '',
 //           'selectedRoute': data['selectedRoute'] ?? '',
@@ -1111,111 +1215,35 @@
 //           'wheelOvernight': (data['wheelOvernight'] ?? 0).toDouble(),
 //           'wheelHoliday': (data['wheelHoliday'] ?? 0).toDouble(),
 //           'selectedPrice': (data['selectedPrice'] ?? 0).toDouble(),
-//           'contractor': docContractor,
-//           'tr': data['tr'] ?? '',
 //           'isPaid': data['isPaid'] ?? false,
 //           'paidAmount': (data['paidAmount'] ?? 0).toDouble(),
 //           'remainingAmount': (data['remainingAmount'] ?? 0).toDouble(),
 //           'paymentDate': data['paymentDate'] as Timestamp?,
 //           'driverNotes': data['driverNotes'] ?? '',
-//           'selectedVehicleType': data['selectedVehicleType'] ?? '',
-//           'selectedNotes': data['selectedNotes'] ?? '',
-//           'priceOfferId': data['priceOfferId'] ?? '',
-//           'createdAt': data['createdAt'] as Timestamp?,
-//           'updatedAt': data['updatedAt'] as Timestamp?,
 //         });
 //       }
-
-//       // إذا لم نجد رحلات، نحاول البحث بدون شرط المقاول (للبيانات القديمة)
-//       if (workList.isEmpty) {
-//         print('لم يتم العثور على رحلات، جارٍ البحث بدون شرط المقاول...');
-
-//         final fallbackSnapshot = await _firestore
-//             .collection('drivers')
-//             .where('driverName', isEqualTo: driverName)
-//             .orderBy('date', descending: true)
-//             .get();
-
-//         for (final doc in fallbackSnapshot.docs) {
-//           final data = doc.data();
-//           final docDriverName = (data['driverName'] ?? '').toString().trim();
-
-//           if (docDriverName == driverName) {
-//             DateTime? date = (data['date'] as Timestamp?)?.toDate();
-
-//             workList.add({
-//               'id': doc.id,
-//               'date': date,
-//               'companyName': data['companyName'] ?? 'غير معروف',
-//               'companyId': data['companyId'] ?? '',
-//               'loadingLocation': data['loadingLocation'] ?? '',
-//               'unloadingLocation': data['unloadingLocation'] ?? '',
-//               'selectedRoute': data['selectedRoute'] ?? '',
-//               'ohda': data['ohda'] ?? '',
-//               'karta': data['karta'] ?? '',
-//               'wheelNolon': (data['wheelNolon'] ?? 0).toDouble(),
-//               'wheelOvernight': (data['wheelOvernight'] ?? 0).toDouble(),
-//               'wheelHoliday': (data['wheelHoliday'] ?? 0).toDouble(),
-//               'selectedPrice': (data['selectedPrice'] ?? 0).toDouble(),
-//               'contractor': data['contractor'] ?? 'غير محدد',
-//               'tr': data['tr'] ?? '',
-//               'isPaid': data['isPaid'] ?? false,
-//               'paidAmount': (data['paidAmount'] ?? 0).toDouble(),
-//               'remainingAmount': (data['remainingAmount'] ?? 0).toDouble(),
-//               'paymentDate': data['paymentDate'] as Timestamp?,
-//               'driverNotes': data['driverNotes'] ?? '',
-//               'selectedVehicleType': data['selectedVehicleType'] ?? '',
-//               'selectedNotes': data['selectedNotes'] ?? '',
-//               'priceOfferId': data['priceOfferId'] ?? '',
-//               'createdAt': data['createdAt'] as Timestamp?,
-//               'updatedAt': data['updatedAt'] as Timestamp?,
-//             });
-//           }
-//         }
-//       }
-
-//       // ترتيب حسب التاريخ (تنازلياً)
-//       workList.sort((a, b) {
-//         final dateA = a['date'] as DateTime?;
-//         final dateB = b['date'] as DateTime?;
-//         if (dateA == null && dateB == null) return 0;
-//         if (dateA == null) return 1;
-//         if (dateB == null) return -1;
-//         return dateB.compareTo(dateA);
-//       });
-
-//       print('تم تحميل ${workList.length} رحلة');
 
 //       setState(() {
 //         _driverWork = workList;
 //         _filteredDriverWork = _filterWorkByDate(workList);
 //         _isLoadingWork = false;
 //       });
-
-//       if (workList.isEmpty) {
-//         _showMessage('لا يوجد شغل مسجل لهذا السائق');
-//       }
 //     } catch (e) {
-//       print('خطأ في تحميل الشغل: $e');
 //       setState(() => _isLoadingWork = false);
-//       _showError('خطأ في تحميل الشغل: $e');
+//       _showError('خطأ في تحميل الشغل');
 //     }
 //   }
 
 //   // ---------------------------
-//   // تصفية الشغل حسب التاريخ - الإصدار المعدل
+//   // تصفية الشغل حسب التاريخ
 //   // ---------------------------
 //   List<Map<String, dynamic>> _filterWorkByDate(
 //     List<Map<String, dynamic>> workList,
 //   ) {
-//     if (_timeFilter == 'الكل') return List.from(workList);
-
 //     return workList.where((work) {
 //       final workDate = work['date'] as DateTime?;
 //       if (workDate == null) return false;
-
 //       final now = DateTime.now();
-
 //       switch (_timeFilter) {
 //         case 'اليوم':
 //           return workDate.year == now.year &&
@@ -1228,6 +1256,7 @@
 //         case 'مخصص':
 //           return workDate.year == _selectedYear &&
 //               workDate.month == _selectedMonth;
+//         case 'الكل':
 //         default:
 //           return true;
 //       }
@@ -1306,6 +1335,400 @@
 //   }
 
 //   // ---------------------------
+//   // إنشاء PDF للتقرير
+//   // ---------------------------
+//   Future<void> _generatePDF() async {
+//     if (_arabicFont == null) {
+//       _showError('الخط العربي غير محمل');
+//       return;
+//     }
+
+//     if (_selectedDriver == null || _filteredDriverWork.isEmpty) {
+//       _showError('لا توجد بيانات للطباعة');
+//       return;
+//     }
+
+//     setState(() => _isGeneratingPDF = true);
+
+//     try {
+//       // حساب الإجماليات
+//       double totalKarta = 0;
+//       double totalOhda = 0;
+//       double totalNolon = 0;
+//       double totalOvernight = 0;
+//       double totalHoliday = 0;
+//       int totalTrips = _filteredDriverWork.length;
+
+//       for (final work in _filteredDriverWork) {
+//         totalKarta += _parseToDouble(work['karta']);
+//         totalOhda += _parseToDouble(work['ohda']);
+//         totalNolon += _parseToDouble(work['wheelNolon']);
+//         totalOvernight += _parseToDouble(work['wheelOvernight']);
+//         totalHoliday += _parseToDouble(work['wheelHoliday']);
+//       }
+
+//       double netAmount =
+//           (totalKarta + totalNolon + totalOvernight + totalHoliday) - totalOhda;
+
+//       // إنشاء PDF
+//       final pdf = pdfLib.Document(
+//         theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
+//       );
+
+//       pdf.addPage(
+//         pdfLib.MultiPage(
+//           pageFormat: PdfPageFormat.a4,
+//           margin: pdfLib.EdgeInsets.all(20),
+//           build: (context) => [
+//             // العنوان الرئيسي
+//             pdfLib.Directionality(
+//               textDirection: pdfLib.TextDirection.rtl,
+//               child: pdfLib.Column(
+//                 children: [
+//                   pdfLib.Row(
+//                     mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+//                     children: [
+//                       pdfLib.Text(
+//                         'تقرير شغل السائقين',
+//                         style: pdfLib.TextStyle(
+//                           fontSize: 16,
+//                           fontWeight: pdfLib.FontWeight.bold,
+//                           font: _arabicFont,
+//                           color: PdfColors.black,
+//                         ),
+//                       ),
+//                       pdfLib.Text(
+//                         DateFormat('yyyy/MM/dd').format(DateTime.now()),
+//                         style: pdfLib.TextStyle(
+//                           fontSize: 10,
+//                           font: _arabicFont,
+//                           color: PdfColors.grey,
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                   pdfLib.Divider(color: PdfColors.black, thickness: 1),
+//                 ],
+//               ),
+//             ),
+//             pdfLib.SizedBox(height: 10),
+
+//             // معلومات السائق
+//             _buildDriverInfoPdf(
+//               _selectedDriver!,
+//               totalTrips,
+//               netAmount,
+//               _selectedContractor ?? '',
+//             ),
+//             pdfLib.SizedBox(height: 15),
+
+//             // الجدول
+//             _buildPdfTable(_filteredDriverWork),
+//             pdfLib.SizedBox(height: 10),
+
+//             // الملخص
+//             _buildSummaryPdf(
+//               totalKarta,
+//               totalOhda,
+//               totalNolon,
+//               totalOvernight,
+//               totalHoliday,
+//               netAmount,
+//             ),
+//           ],
+//         ),
+//       );
+
+//       // طباعة PDF
+//       await Printing.layoutPdf(
+//         onLayout: (PdfPageFormat format) async => pdf.save(),
+//         name: _getPDFFileName(),
+//       );
+//     } catch (e) {
+//       _showError('حدث خطأ في إنشاء PDF: $e');
+//     } finally {
+//       setState(() => _isGeneratingPDF = false);
+//     }
+//   }
+
+//   // دالة مساعدة لتحويل إلى double
+//   double _parseToDouble(dynamic value) {
+//     if (value == null) return 0.0;
+//     if (value is num) return value.toDouble();
+//     if (value is String) {
+//       try {
+//         return double.tryParse(value) ?? 0.0;
+//       } catch (e) {
+//         return 0.0;
+//       }
+//     }
+//     return 0.0;
+//   }
+
+//   // بناء معلومات السائق للPDF
+//   pdfLib.Widget _buildDriverInfoPdf(
+//     String driverName,
+//     int totalTrips,
+//     double netAmount,
+//     String contractor,
+//   ) {
+//     return pdfLib.Directionality(
+//       textDirection: pdfLib.TextDirection.rtl,
+//       child: pdfLib.Container(
+//         padding: pdfLib.EdgeInsets.all(8),
+//         decoration: pdfLib.BoxDecoration(
+//           border: pdfLib.Border.all(color: PdfColors.blue, width: 0.5),
+//           borderRadius: pdfLib.BorderRadius.circular(5),
+//         ),
+//         child: pdfLib.Column(
+//           crossAxisAlignment: pdfLib.CrossAxisAlignment.start,
+//           children: [
+//             // اسم السائق وعدد الرحلات في نفس السطر
+//             pdfLib.Row(
+//               mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+//               children: [
+//                 pdfLib.Text(
+//                   'اسم السائق: $driverName',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 12,
+//                     fontWeight: pdfLib.FontWeight.bold,
+//                     font: _arabicFont,
+//                     color: PdfColors.black,
+//                   ),
+//                 ),
+//                 pdfLib.Text(
+//                   'عدد الرحلات: $totalTrips',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 10,
+//                     font: _arabicFont,
+//                     color: PdfColors.blue,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             pdfLib.SizedBox(height: 4),
+
+//             // الصافي في السطر الثاني
+//             pdfLib.Row(
+//               mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+//               children: [
+//                 pdfLib.Text(
+//                   'الصافي: ${netAmount.toStringAsFixed(2)} ج',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 12,
+//                     fontWeight: pdfLib.FontWeight.bold,
+//                     font: _arabicFont,
+//                     color: netAmount >= 0 ? PdfColors.green : PdfColors.red,
+//                   ),
+//                 ),
+//                 if (contractor.isNotEmpty)
+//                   pdfLib.Text(
+//                     'المقاول: $contractor',
+//                     style: pdfLib.TextStyle(
+//                       fontSize: 10,
+//                       font: _arabicFont,
+//                       color: PdfColors.grey,
+//                     ),
+//                   ),
+//               ],
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // بناء الجدول في PDF
+//   pdfLib.Widget _buildPdfTable(List<Map<String, dynamic>> workList) {
+//     return pdfLib.Directionality(
+//       textDirection: pdfLib.TextDirection.rtl,
+//       child: pdfLib.Table.fromTextArray(
+//         border: pdfLib.TableBorder.all(color: PdfColors.grey, width: 0.5),
+//         cellAlignment: pdfLib.Alignment.center,
+//         headerDecoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
+//         headerStyle: pdfLib.TextStyle(
+//           fontSize: 9,
+//           fontWeight: pdfLib.FontWeight.bold,
+//           font: _arabicFont,
+//           color: PdfColors.black,
+//         ),
+//         cellStyle: pdfLib.TextStyle(
+//           fontSize: 8,
+//           font: _arabicFont,
+//           color: PdfColors.black,
+//         ),
+//         cellAlignments: {
+//           0: pdfLib.Alignment.center, // م
+//           1: pdfLib.Alignment.center, // التاريخ
+//           2: pdfLib.Alignment.center, // من
+//           3: pdfLib.Alignment.center, // إلى
+//           4: pdfLib.Alignment.center, // العهدة
+//           5: pdfLib.Alignment.center, // الكارتة
+//           6: pdfLib.Alignment.center, // النولون
+//           7: pdfLib.Alignment.center, // المبيت
+//           8: pdfLib.Alignment.center, // العطلة
+//         },
+//         columnWidths: {
+//           0: pdfLib.FlexColumnWidth(0.4), // م
+//           1: pdfLib.FlexColumnWidth(1.0), // التاريخ
+//           2: pdfLib.FlexColumnWidth(1.2), // من
+//           3: pdfLib.FlexColumnWidth(1.2), // إلى
+//           4: pdfLib.FlexColumnWidth(0.8), // العهدة
+//           5: pdfLib.FlexColumnWidth(0.8), // الكارتة
+//           6: pdfLib.FlexColumnWidth(0.8), // النولون
+//           7: pdfLib.FlexColumnWidth(0.8), // المبيت
+//           8: pdfLib.FlexColumnWidth(0.8), // العطلة
+//         },
+//         headers: [
+//           'م',
+//           'التاريخ',
+//           'من',
+//           'إلى',
+//           'العهدة',
+//           'الكارتة',
+//           'النولون',
+//           'المبيت',
+//           'العطلة',
+//         ],
+//         data: List<List<String>>.generate(workList.length, (index) {
+//           final work = workList[index];
+//           final date = work['date'] as DateTime?;
+//           return [
+//             (index + 1).toString(),
+//             date != null ? DateFormat('dd/MM/yy').format(date) : '-',
+//             work['loadingLocation'] ?? '',
+//             work['unloadingLocation'] ?? '',
+//             _parseToDouble(work['ohda']).toStringAsFixed(2),
+//             _parseToDouble(work['karta']).toStringAsFixed(2),
+//             _parseToDouble(work['wheelNolon']).toStringAsFixed(2),
+//             _parseToDouble(work['wheelOvernight']).toStringAsFixed(2),
+//             _parseToDouble(work['wheelHoliday']).toStringAsFixed(2),
+//           ];
+//         }),
+//       ),
+//     );
+//   }
+
+//   // بناء ملخص الإجماليات للPDF
+//   pdfLib.Widget _buildSummaryPdf(
+//     double totalKarta,
+//     double totalOhda,
+//     double totalNolon,
+//     double totalOvernight,
+//     double totalHoliday,
+//     double netAmount,
+//   ) {
+//     return pdfLib.Directionality(
+//       textDirection: pdfLib.TextDirection.rtl,
+//       child: pdfLib.Container(
+//         padding: pdfLib.EdgeInsets.all(8),
+//         decoration: pdfLib.BoxDecoration(
+//           border: pdfLib.Border.all(color: PdfColors.black, width: 0.5),
+//           borderRadius: pdfLib.BorderRadius.circular(5),
+//         ),
+//         child: pdfLib.Column(
+//           crossAxisAlignment: pdfLib.CrossAxisAlignment.start,
+//           children: [
+//             pdfLib.Text(
+//               'ملخص الإجماليات',
+//               style: pdfLib.TextStyle(
+//                 fontSize: 10,
+//                 fontWeight: pdfLib.FontWeight.bold,
+//                 font: _arabicFont,
+//                 color: PdfColors.black,
+//               ),
+//             ),
+//             pdfLib.SizedBox(height: 5),
+//             pdfLib.Row(
+//               mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+//               children: [
+//                 pdfLib.Text(
+//                   'إجمالي الكارتة: ${totalKarta.toStringAsFixed(2)} ج',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 8,
+//                     font: _arabicFont,
+//                     color: PdfColors.black,
+//                   ),
+//                 ),
+//                 pdfLib.Text(
+//                   'إجمالي العهدة: ${totalOhda.toStringAsFixed(2)} ج',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 8,
+//                     font: _arabicFont,
+//                     color: PdfColors.red,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             pdfLib.SizedBox(height: 3),
+//             pdfLib.Row(
+//               mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+//               children: [
+//                 pdfLib.Text(
+//                   'إجمالي النولون: ${totalNolon.toStringAsFixed(2)} ج',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 8,
+//                     font: _arabicFont,
+//                     color: PdfColors.green,
+//                   ),
+//                 ),
+//                 pdfLib.Text(
+//                   'إجمالي المبيت: ${totalOvernight.toStringAsFixed(2)} ج',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 8,
+//                     font: _arabicFont,
+//                     color: PdfColors.blue,
+//                   ),
+//                 ),
+//                 pdfLib.Text(
+//                   'إجمالي العطلة: ${totalHoliday.toStringAsFixed(2)} ج',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 8,
+//                     font: _arabicFont,
+//                     color: PdfColors.orange,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             pdfLib.SizedBox(height: 5),
+//             pdfLib.Divider(color: PdfColors.grey, thickness: 0.5),
+//             pdfLib.Row(
+//               mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+//               children: [
+//                 pdfLib.Text(
+//                   'الصافي النهائي:',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 10,
+//                     fontWeight: pdfLib.FontWeight.bold,
+//                     font: _arabicFont,
+//                     color: PdfColors.black,
+//                   ),
+//                 ),
+//                 pdfLib.Text(
+//                   '${netAmount.toStringAsFixed(2)} ج',
+//                   style: pdfLib.TextStyle(
+//                     fontSize: 12,
+//                     fontWeight: pdfLib.FontWeight.bold,
+//                     font: _arabicFont,
+//                     color: netAmount >= 0 ? PdfColors.green : PdfColors.red,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // الحصول على اسم الملف
+//   String _getPDFFileName() {
+//     final now = DateTime.now();
+//     final formattedDate = DateFormat('yyyyMMdd').format(now);
+//     return 'تقرير_${_selectedDriver}_$formattedDate';
+//   }
+
+//   // ---------------------------
 //   // الرسائل
 //   // ---------------------------
 //   void _showError(String message) {
@@ -1328,23 +1751,13 @@
 //     );
 //   }
 
-//   void _showMessage(String message) {
-//     ScaffoldMessenger.of(context).showSnackBar(
-//       SnackBar(
-//         content: Text(message),
-//         backgroundColor: Colors.blue,
-//         duration: Duration(seconds: 2),
-//       ),
-//     );
-//   }
-
 //   String _formatDate(DateTime? date) {
 //     if (date == null) return '-';
 //     return DateFormat('dd/MM/yyyy').format(date);
 //   }
 
 //   // ---------------------------
-//   // AppBar
+//   // AppBar معدل لإضافة زر الطباعة
 //   // ---------------------------
 //   Widget _buildCustomAppBar() {
 //     String title = 'شغل السائقين';
@@ -1392,6 +1805,24 @@
 //                 overflow: TextOverflow.ellipsis,
 //               ),
 //             ),
+
+//             // زر الطباعة إذا كان هناك سائق محدد
+//             if (_selectedDriver != null && _filteredDriverWork.isNotEmpty)
+//               IconButton(
+//                 icon: _isGeneratingPDF
+//                     ? SizedBox(
+//                         width: 20,
+//                         height: 20,
+//                         child: CircularProgressIndicator(
+//                           strokeWidth: 2,
+//                           valueColor: AlwaysStoppedAnimation<Color>(
+//                             Colors.white,
+//                           ),
+//                         ),
+//                       )
+//                     : Icon(Icons.print, color: Colors.white),
+//                 onPressed: _isGeneratingPDF ? null : _generatePDF,
+//               ),
 
 //             // الوقت
 //             StreamBuilder<DateTime>(
@@ -1641,9 +2072,6 @@
 //                   itemCount: filteredDrivers.length,
 //                   itemBuilder: (context, index) {
 //                     final driver = filteredDrivers[index];
-//                     final totalWheelNolon = driver['totalWheelNolon'] ?? 0.0;
-//                     final totalPaid = driver['totalPaid'] ?? 0.0;
-//                     final totalRemaining = totalWheelNolon - totalPaid;
 
 //                     return Container(
 //                       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -1695,27 +2123,6 @@
 //                                 ),
 //                               ],
 //                             ),
-//                             SizedBox(height: 2),
-//                             Row(
-//                               children: [
-//                                 Icon(
-//                                   Icons.attach_money,
-//                                   size: 14,
-//                                   color: Colors.grey,
-//                                 ),
-//                                 SizedBox(width: 4),
-//                                 Text(
-//                                   'المتبقي: ${totalRemaining.toStringAsFixed(2)} ج',
-//                                   style: TextStyle(
-//                                     fontSize: 12,
-//                                     color: totalRemaining > 0
-//                                         ? Colors.red
-//                                         : Colors.green,
-//                                     fontWeight: FontWeight.bold,
-//                                   ),
-//                                 ),
-//                               ],
-//                             ),
 //                           ],
 //                         ),
 //                         trailing: Icon(
@@ -1734,334 +2141,156 @@
 //   }
 
 //   // ---------------------------
-//   // واجهة جدول شغل السائق - الإصدار المعدل
+//   // واجهة جدول شغل السائق
 //   // ---------------------------
-//   Widget _buildDriverWorkTable() {
-//     if (_isLoadingWork) {
-//       return Center(
-//         child: Column(
-//           mainAxisAlignment: MainAxisAlignment.center,
-//           children: [
-//             CircularProgressIndicator(
-//               valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3498DB)),
-//             ),
-//             SizedBox(height: 16),
-//             Text('جارٍ تحميل شغل السائق...'),
-//           ],
-//         ),
-//       );
-//     }
+//   Widget _buildWorkTable() {
+//     if (_isLoadingWork) return const Center(child: CircularProgressIndicator());
 
 //     return Column(
 //       children: [
-//         // فلتر الوقت
-//         _buildTimeFilterSection(),
-
-//         // معلومات السائق
 //         Container(
-//           padding: EdgeInsets.all(16),
+//           padding: const EdgeInsets.all(12),
 //           color: Colors.blue[50],
 //           child: Row(
-//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//             mainAxisAlignment: MainAxisAlignment.center,
 //             children: [
-//               Column(
-//                 crossAxisAlignment: CrossAxisAlignment.start,
-//                 children: [
-//                   Text(
-//                     'السائق: $_selectedDriver',
-//                     style: TextStyle(
-//                       fontWeight: FontWeight.bold,
-//                       fontSize: 16,
-//                       color: Color(0xFF2C3E50),
-//                     ),
-//                   ),
-//                   Text(
-//                     'المقاول: $_selectedContractor',
-//                     style: TextStyle(color: Colors.grey[600]),
-//                   ),
-//                 ],
-//               ),
-//               Column(
-//                 crossAxisAlignment: CrossAxisAlignment.end,
-//                 children: [
-//                   Text(
-//                     'عدد الرحلات: ${_filteredDriverWork.length}',
-//                     style: TextStyle(
-//                       fontWeight: FontWeight.bold,
-//                       color: Color(0xFF3498DB),
-//                     ),
-//                   ),
-//                   Text(
-//                     'عرض: ${_getFilterText()}',
-//                     style: TextStyle(fontSize: 12, color: Colors.grey),
-//                   ),
-//                 ],
+//               Icon(Icons.filter_alt, color: Colors.blue[700], size: 16),
+//               const SizedBox(width: 8),
+//               Text(
+//                 _getFilterText(),
+//                 style: TextStyle(
+//                   color: Colors.blue[700],
+//                   fontWeight: FontWeight.bold,
+//                 ),
 //               ),
 //             ],
 //           ),
 //         ),
-
-//         // الجدول
 //         Expanded(
-//           child: _filteredDriverWork.isEmpty
-//               ? Center(
-//                   child: Column(
-//                     mainAxisAlignment: MainAxisAlignment.center,
-//                     children: [
-//                       Icon(Icons.work_off, size: 60, color: Colors.grey),
-//                       SizedBox(height: 16),
-//                       Text(
-//                         _driverWork.isEmpty
-//                             ? 'لا يوجد شغل مسجل لهذا السائق'
-//                             : 'لا يوجد شغل في الفترة المحددة',
-//                         style: TextStyle(
+//           child: Container(
+//             margin: const EdgeInsets.all(16),
+//             child: _filteredDriverWork.isEmpty
+//                 ? Center(
+//                     child: Column(
+//                       mainAxisAlignment: MainAxisAlignment.center,
+//                       children: [
+//                         const Icon(
+//                           Icons.work_off,
+//                           size: 60,
 //                           color: Colors.grey,
-//                           fontSize: 18,
-//                           fontWeight: FontWeight.bold,
 //                         ),
-//                       ),
-//                       SizedBox(height: 8),
-//                       if (_timeFilter != 'الكل')
-//                         ElevatedButton(
-//                           onPressed: () {
-//                             setState(() => _timeFilter = 'الكل');
-//                             _filteredDriverWork = _driverWork;
-//                           },
-//                           child: Text('عرض كل الرحلات'),
-//                           style: ElevatedButton.styleFrom(
-//                             backgroundColor: Color(0xFF3498DB),
+//                         const SizedBox(height: 16),
+//                         Text(
+//                           _driverWork.isEmpty
+//                               ? 'لا يوجد شغل مسجل لهذا السائق'
+//                               : 'لا يوجد شغل في الفترة المحددة',
+//                           style: const TextStyle(
+//                             color: Colors.grey,
+//                             fontSize: 18,
+//                             fontWeight: FontWeight.bold,
 //                           ),
 //                         ),
-//                     ],
+//                       ],
+//                     ),
+//                   )
+//                 : SingleChildScrollView(
+//                     scrollDirection: Axis.horizontal,
+//                     child: SingleChildScrollView(
+//                       scrollDirection: Axis.vertical,
+//                       child: Table(
+//                         defaultColumnWidth: const FixedColumnWidth(120),
+//                         border: TableBorder.all(
+//                           color: const Color(0xFF3498DB),
+//                           width: 1,
+//                         ),
+//                         children: [
+//                           TableRow(
+//                             decoration: BoxDecoration(
+//                               color: const Color(0xFF3498DB).withOpacity(0.15),
+//                             ),
+//                             children: const [
+//                               TableCellHeader('عطلة العجل'),
+//                               TableCellHeader('مبيت العجل'),
+//                               TableCellHeader('نولون العجل'),
+//                               TableCellHeader('الكارتة'),
+//                               TableCellHeader('العهدة'),
+//                               TableCellHeader('اسم الموقع'),
+//                               TableCellHeader('مكان التعتيق'),
+//                               TableCellHeader('مكان التحميل'),
+//                               TableCellHeader('التاريخ'),
+//                               TableCellHeader('م'),
+//                             ],
+//                           ),
+//                           ..._filteredDriverWork.asMap().entries.map((entry) {
+//                             final index = entry.key;
+//                             final work = entry.value;
+
+//                             return TableRow(
+//                               decoration: BoxDecoration(
+//                                 color: index.isEven
+//                                     ? Colors.white
+//                                     : const Color(0xFFF8F9FA),
+//                               ),
+//                               children: [
+//                                 TableCellBody(
+//                                   '${work['wheelHoliday']} ج',
+//                                   textStyle: const TextStyle(
+//                                     fontWeight: FontWeight.bold,
+//                                     color: Colors.red,
+//                                   ),
+//                                 ),
+//                                 TableCellBody(
+//                                   '${work['wheelOvernight']} ج',
+//                                   textStyle: const TextStyle(
+//                                     fontWeight: FontWeight.bold,
+//                                   ),
+//                                 ),
+//                                 TableCellBody(
+//                                   '${work['wheelNolon']} ج',
+//                                   textStyle: const TextStyle(
+//                                     fontWeight: FontWeight.bold,
+//                                     color: Colors.green,
+//                                   ),
+//                                 ),
+//                                 TableCellBody(work['karta']),
+//                                 TableCellBody(work['ohda']),
+//                                 TableCellBody(
+//                                   work['selectedRoute'],
+//                                   textStyle: const TextStyle(
+//                                     fontWeight: FontWeight.bold,
+//                                     color: Color(0xFF3498DB),
+//                                   ),
+//                                 ),
+//                                 TableCellBody(work['unloadingLocation']),
+//                                 TableCellBody(work['loadingLocation']),
+//                                 TableCellBody(_formatDate(work['date'])),
+//                                 TableCellBody('${index + 1}'),
+//                               ],
+//                             );
+//                           }),
+//                         ],
+//                       ),
+//                     ),
 //                   ),
-//                 )
-//               : _buildWorkTableContent(),
+//           ),
 //         ),
 //       ],
 //     );
 //   }
 
-//   // ---------------------------
-//   // محتوى جدول الشغل
-//   // ---------------------------
-//   Widget _buildWorkTableContent() {
-//     // حساب الإجماليات
-//     double totalWheelNolon = 0;
-//     double totalOvernight = 0;
-//     double totalHoliday = 0;
-//     double totalPaid = 0;
-
-//     for (final work in _filteredDriverWork) {
-//       totalWheelNolon += (work['wheelNolon'] ?? 0).toDouble();
-//       totalOvernight += (work['wheelOvernight'] ?? 0).toDouble();
-//       totalHoliday += (work['wheelHoliday'] ?? 0).toDouble();
-//       totalPaid += (work['paidAmount'] ?? 0).toDouble();
+//   String _getFilterText() {
+//     switch (_timeFilter) {
+//       case 'اليوم':
+//         return 'عرض رحلات اليوم';
+//       case 'هذا الشهر':
+//         return 'عرض رحلات هذا الشهر';
+//       case 'هذه السنة':
+//         return 'عرض رحلات هذه السنة';
+//       case 'مخصص':
+//         return 'عرض رحلات شهر $_selectedMonth سنة $_selectedYear';
+//       default:
+//         return 'عرض جميع الرحلات';
 //     }
-
-//     final totalAll = totalWheelNolon + totalOvernight + totalHoliday;
-//     final totalRemaining = totalAll - totalPaid;
-
-//     return SingleChildScrollView(
-//       child: Column(
-//         children: [
-//           // الإجماليات
-//           Container(
-//             padding: EdgeInsets.all(12),
-//             color: Colors.green[50],
-//             child: Row(
-//               mainAxisAlignment: MainAxisAlignment.spaceAround,
-//               children: [
-//                 _buildSummaryItem('نولون العجل', totalWheelNolon, Colors.blue),
-//                 _buildSummaryItem('مبيت العجل', totalOvernight, Colors.orange),
-//                 _buildSummaryItem('عطلة العجل', totalHoliday, Colors.red),
-//                 _buildSummaryItem('الإجمالي', totalAll, Colors.green),
-//                 _buildSummaryItem(
-//                   'المتبقي',
-//                   totalRemaining,
-//                   totalRemaining > 0 ? Colors.red : Colors.green,
-//                 ),
-//               ],
-//             ),
-//           ),
-
-//           // الجدول
-//           SingleChildScrollView(
-//             scrollDirection: Axis.horizontal,
-//             child: DataTable(
-//               columnSpacing: 12,
-//               horizontalMargin: 12,
-//               headingRowHeight: 60,
-//               dataRowHeight: 50,
-//               headingRowColor: MaterialStateProperty.all(
-//                 Color(0xFF3498DB).withOpacity(0.1),
-//               ),
-//               columns: [
-//                 DataColumn(label: _buildTableHeader('م')),
-//                 DataColumn(label: _buildTableHeader('التاريخ')),
-//                 DataColumn(label: _buildTableHeader('الشركة')),
-//                 DataColumn(label: _buildTableHeader('مكان التحميل')),
-//                 DataColumn(label: _buildTableHeader('مكان التعتيق')),
-//                 DataColumn(label: _buildTableHeader('المسار')),
-//                 DataColumn(label: _buildTableHeader('العهدة')),
-//                 DataColumn(label: _buildTableHeader('الكارتة')),
-//                 DataColumn(label: _buildTableHeader('نولون العجل')),
-//                 DataColumn(label: _buildTableHeader('مبيت العجل')),
-//                 DataColumn(label: _buildTableHeader('عطلة العجل')),
-//                 DataColumn(label: _buildTableHeader('الإجمالي')),
-//                 DataColumn(label: _buildTableHeader('المقاول')),
-//                 DataColumn(label: _buildTableHeader('TR')),
-//                 DataColumn(label: _buildTableHeader('الحالة')),
-//               ],
-//               rows: _filteredDriverWork.asMap().entries.map((entry) {
-//                 final index = entry.key;
-//                 final work = entry.value;
-
-//                 final wheelNolon = (work['wheelNolon'] ?? 0).toDouble();
-//                 final overnight = (work['wheelOvernight'] ?? 0).toDouble();
-//                 final holiday = (work['wheelHoliday'] ?? 0).toDouble();
-//                 final rowTotal = wheelNolon + overnight + holiday;
-//                 final isPaid = work['isPaid'] ?? false;
-//                 final paidAmount = (work['paidAmount'] ?? 0).toDouble();
-//                 final remaining = rowTotal - paidAmount;
-
-//                 return DataRow(
-//                   color: MaterialStateProperty.resolveWith<Color?>((
-//                     Set<MaterialState> states,
-//                   ) {
-//                     if (index.isEven) {
-//                       return Colors.grey[50];
-//                     }
-//                     return null;
-//                   }),
-//                   cells: [
-//                     DataCell(Text('${index + 1}')),
-//                     DataCell(Text(_formatDate(work['date']))),
-//                     DataCell(
-//                       Container(
-//                         width: 100,
-//                         child: Text(
-//                           work['companyName'],
-//                           overflow: TextOverflow.ellipsis,
-//                         ),
-//                       ),
-//                     ),
-//                     DataCell(
-//                       Container(
-//                         width: 100,
-//                         child: Text(
-//                           work['loadingLocation'],
-//                           overflow: TextOverflow.ellipsis,
-//                         ),
-//                       ),
-//                     ),
-//                     DataCell(
-//                       Container(
-//                         width: 100,
-//                         child: Text(
-//                           work['unloadingLocation'],
-//                           overflow: TextOverflow.ellipsis,
-//                         ),
-//                       ),
-//                     ),
-//                     DataCell(
-//                       Container(
-//                         width: 120,
-//                         child: Text(
-//                           work['selectedRoute'],
-//                           overflow: TextOverflow.ellipsis,
-//                           style: TextStyle(
-//                             color: Color(0xFF3498DB),
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ),
-//                     DataCell(Text(work['ohda'])),
-//                     DataCell(Text(work['karta'])),
-//                     DataCell(
-//                       Text(
-//                         '${wheelNolon.toStringAsFixed(2)} ج',
-//                         style: TextStyle(fontWeight: FontWeight.bold),
-//                       ),
-//                     ),
-//                     DataCell(
-//                       Text(
-//                         '${overnight.toStringAsFixed(2)} ج',
-//                         style: TextStyle(color: Colors.orange),
-//                       ),
-//                     ),
-//                     DataCell(
-//                       Text(
-//                         '${holiday.toStringAsFixed(2)} ج',
-//                         style: TextStyle(color: Colors.red),
-//                       ),
-//                     ),
-//                     DataCell(
-//                       Text(
-//                         '${rowTotal.toStringAsFixed(2)} ج',
-//                         style: TextStyle(
-//                           fontWeight: FontWeight.bold,
-//                           color: Colors.green,
-//                         ),
-//                       ),
-//                     ),
-//                     DataCell(Text(work['contractor'])),
-//                     DataCell(Text(work['tr'])),
-//                     DataCell(
-//                       Container(
-//                         padding: EdgeInsets.symmetric(
-//                           horizontal: 8,
-//                           vertical: 4,
-//                         ),
-//                         decoration: BoxDecoration(
-//                           color: isPaid ? Colors.green[100] : Colors.red[100],
-//                           borderRadius: BorderRadius.circular(4),
-//                         ),
-//                         child: Text(
-//                           isPaid ? 'مدفوع' : 'غير مدفوع',
-//                           style: TextStyle(
-//                             color: isPaid ? Colors.green[800] : Colors.red[800],
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ),
-//                   ],
-//                 );
-//               }).toList(),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   Widget _buildSummaryItem(String label, double value, Color color) {
-//     return Column(
-//       children: [
-//         Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-//         SizedBox(height: 4),
-//         Text(
-//           '${value.toStringAsFixed(2)} ج',
-//           style: TextStyle(
-//             fontSize: 14,
-//             fontWeight: FontWeight.bold,
-//             color: color,
-//           ),
-//         ),
-//       ],
-//     );
-//   }
-
-//   Widget _buildTableHeader(String text) {
-//     return Container(
-//       padding: EdgeInsets.symmetric(horizontal: 8),
-//       child: Text(
-//         text,
-//         style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
-//         textAlign: TextAlign.center,
-//       ),
-//     );
 //   }
 
 //   // ---------------------------
@@ -2069,106 +2298,73 @@
 //   // ---------------------------
 //   Widget _buildTimeFilterSection() {
 //     return Container(
-//       padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+//       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
 //       color: Colors.white,
 //       child: Column(
 //         children: [
-//           // الفلاتر السريعة
-//           SingleChildScrollView(
-//             scrollDirection: Axis.horizontal,
-//             child: Row(
-//               children: ['الكل', 'اليوم', 'هذا الشهر', 'هذه السنة', 'مخصص']
-//                   .map(
-//                     (filter) => Padding(
-//                       padding: EdgeInsets.symmetric(horizontal: 4),
-//                       child: ChoiceChip(
-//                         label: Text(filter),
-//                         selected: _timeFilter == filter,
-//                         onSelected: (selected) {
-//                           if (selected) _changeTimeFilter(filter);
-//                         },
-//                         selectedColor: Color(0xFF3498DB),
-//                         labelStyle: TextStyle(
-//                           color: _timeFilter == filter
-//                               ? Colors.white
-//                               : Color(0xFF2C3E50),
-//                         ),
-//                       ),
-//                     ),
-//                   )
-//                   .toList(),
-//             ),
-//           ),
-
-//           // فلتر مخصص (شهر/سنة)
-//           if (_timeFilter == 'مخصص')
-//             Container(
-//               margin: EdgeInsets.only(top: 12),
-//               padding: EdgeInsets.all(12),
-//               decoration: BoxDecoration(
-//                 color: Colors.grey[50],
-//                 borderRadius: BorderRadius.circular(8),
+//           TextField(
+//             decoration: InputDecoration(
+//               hintText: 'ابحث باسم المقاول',
+//               prefixIcon: const Icon(Icons.search, color: Color(0xFF3498DB)),
+//               border: OutlineInputBorder(
+//                 borderRadius: BorderRadius.circular(12),
 //               ),
-//               child: Row(
-//                 mainAxisAlignment: MainAxisAlignment.center,
-//                 children: [
-//                   Icon(Icons.calendar_month, color: Color(0xFF3498DB)),
-//                   SizedBox(width: 8),
-//                   DropdownButton<int>(
-//                     value: _selectedMonth,
-//                     onChanged: (value) {
-//                       if (value != null) {
-//                         setState(() => _selectedMonth = value);
-//                         _applyMonthYearFilter();
-//                       }
-//                     },
-//                     items: List.generate(12, (index) {
-//                       final monthNumber = index + 1;
-//                       return DropdownMenuItem(
-//                         value: monthNumber,
-//                         child: Text('شهر $monthNumber'),
-//                       );
-//                     }),
-//                   ),
-//                   SizedBox(width: 20),
-//                   DropdownButton<int>(
-//                     value: _selectedYear,
-//                     onChanged: (value) {
-//                       if (value != null) {
-//                         setState(() => _selectedYear = value);
-//                         _applyMonthYearFilter();
-//                       }
-//                     },
-//                     items: [
-//                       for (
-//                         int i = DateTime.now().year - 2;
-//                         i <= DateTime.now().year + 2;
-//                         i++
-//                       )
-//                         DropdownMenuItem(value: i, child: Text('$i')),
-//                     ],
-//                   ),
+//               contentPadding: const EdgeInsets.symmetric(
+//                 vertical: 0,
+//                 horizontal: 12,
+//               ),
+//             ),
+//             onChanged: (value) {
+//               setState(() {
+//                 _searchContractorQuery = value;
+//               });
+//             },
+//           ),
+//           const SizedBox(height: 12),
+//           Row(
+//             mainAxisAlignment: MainAxisAlignment.center,
+//             children: [
+//               const Icon(Icons.calendar_month, color: Color(0xFF3498DB)),
+//               const SizedBox(width: 8),
+//               DropdownButton<int>(
+//                 value: _selectedMonth,
+//                 onChanged: (value) {
+//                   if (value != null) {
+//                     setState(() => _selectedMonth = value);
+//                     _applyMonthYearFilter();
+//                   }
+//                 },
+//                 items: List.generate(12, (index) {
+//                   final monthNumber = index + 1;
+//                   return DropdownMenuItem(
+//                     value: monthNumber,
+//                     child: Text('شهر $monthNumber'),
+//                   );
+//                 }),
+//               ),
+//               const SizedBox(width: 20),
+//               DropdownButton<int>(
+//                 value: _selectedYear,
+//                 onChanged: (value) {
+//                   if (value != null) {
+//                     setState(() => _selectedYear = value);
+//                     _applyMonthYearFilter();
+//                   }
+//                 },
+//                 items: [
+//                   for (
+//                     int i = DateTime.now().year - 2;
+//                     i <= DateTime.now().year + 2;
+//                     i++
+//                   )
+//                     DropdownMenuItem(value: i, child: Text('$i')),
 //                 ],
 //               ),
-//             ),
+//             ],
+//           ),
 //         ],
 //       ),
 //     );
-//   }
-
-//   String _getFilterText() {
-//     switch (_timeFilter) {
-//       case 'اليوم':
-//         return 'اليوم';
-//       case 'هذا الشهر':
-//         return 'هذا الشهر';
-//       case 'هذه السنة':
-//         return 'هذه السنة';
-//       case 'مخصص':
-//         return 'شهر $_selectedMonth سنة $_selectedYear';
-//       default:
-//         return 'الكل';
-//     }
 //   }
 
 //   // ---------------------------
@@ -2181,28 +2377,82 @@
 //       body: Column(
 //         children: [
 //           _buildCustomAppBar(),
+//           if (_selectedDriver == null && _selectedContractor == null)
+//             _buildTimeFilterSection(),
 //           Expanded(
 //             child: _selectedDriver != null
-//                 ? _buildDriverWorkTable()
+//                 ? _buildWorkTable()
 //                 : (_selectedContractor != null
 //                       ? _buildDriversList()
 //                       : _buildContractorsList()),
 //           ),
 //         ],
 //       ),
-//       floatingActionButton: FloatingActionButton(
-//         onPressed: () {
-//           if (_selectedDriver != null) {
-//             _loadDriverWork(_selectedDriver!);
-//           } else if (_selectedContractor != null) {
-//             _loadDriversByContractor(_selectedContractor!);
-//           } else {
-//             _loadContractors();
-//           }
-//         },
-//         backgroundColor: Color(0xFF3498DB),
-//         child: Icon(Icons.refresh, color: Colors.white),
-//         tooltip: 'تحديث',
+//       floatingActionButton: _isGeneratingPDF
+//           ? FloatingActionButton(
+//               onPressed: null,
+//               backgroundColor: Colors.grey,
+//               child: CircularProgressIndicator(
+//                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+//               ),
+//             )
+//           : FloatingActionButton(
+//               onPressed: () {
+//                 if (_selectedDriver != null) {
+//                   _loadDriverWork(_selectedDriver!);
+//                 } else if (_selectedContractor != null) {
+//                   _loadDriversByContractor(_selectedContractor!);
+//                 } else {
+//                   _loadContractors();
+//                 }
+//               },
+//               backgroundColor: Color(0xFF3498DB),
+//               tooltip: 'تحديث',
+//               child: Icon(Icons.refresh, color: Colors.white),
+//             ),
+//     );
+//   }
+// }
+
+// // ===== TableCellHeader & TableCellBody components =====
+// class TableCellHeader extends StatelessWidget {
+//   final String text;
+//   const TableCellHeader(this.text, {super.key});
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       height: 50,
+//       alignment: Alignment.center,
+//       padding: const EdgeInsets.symmetric(horizontal: 8),
+//       child: Text(
+//         text,
+//         style: const TextStyle(
+//           fontWeight: FontWeight.bold,
+//           fontSize: 14,
+//           color: Color(0xFF2C3E50),
+//         ),
+//         textAlign: TextAlign.center,
+//       ),
+//     );
+//   }
+// }
+
+// class TableCellBody extends StatelessWidget {
+//   final String text;
+//   final TextStyle? textStyle;
+//   const TableCellBody(this.text, {this.textStyle, super.key});
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       height: 48,
+//       alignment: Alignment.center,
+//       padding: const EdgeInsets.symmetric(horizontal: 8),
+//       child: Text(
+//         text,
+//         maxLines: 2,
+//         overflow: TextOverflow.ellipsis,
+//         textAlign: TextAlign.center,
+//         style: textStyle ?? const TextStyle(fontSize: 14),
 //       ),
 //     );
 //   }
@@ -2211,6 +2461,10 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pdfLib;
+import 'package:printing/printing.dart';
+import 'package:flutter/services.dart';
 
 class DriverWorkPage extends StatefulWidget {
   const DriverWorkPage({super.key});
@@ -2226,7 +2480,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   List<String> _contractors = []; // قائمة المقاولين
   List<Map<String, dynamic>> _driversByContractor = []; // السائقين حسب المقاول
 
-  // بيانات شغل السائق (من الكود القديم)
+  // بيانات شغل السائق
   List<Map<String, dynamic>> _driverWork = [];
   List<Map<String, dynamic>> _filteredDriverWork = [];
 
@@ -2238,6 +2492,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   bool _isLoading = false;
   bool _isLoadingDrivers = false;
   bool _isLoadingWork = false;
+  bool _isGeneratingPDF = false;
 
   // الفلاتر
   String _searchContractorQuery = '';
@@ -2246,10 +2501,26 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
 
+  // للطباعة
+  pdfLib.Font? _arabicFont;
+
   @override
   void initState() {
     super.initState();
     _loadContractors();
+    _loadArabicFont();
+  }
+
+  // تحميل الخط العربي للطباعة
+  Future<void> _loadArabicFont() async {
+    try {
+      final fontData = await rootBundle.load(
+        'assets/fonts/Amiri/Amiri-Regular.ttf',
+      );
+      _arabicFont = pdfLib.Font.ttf(fontData);
+    } catch (e) {
+      debugPrint('فشل تحميل الخط العربي: $e');
+    }
   }
 
   // ---------------------------
@@ -2352,7 +2623,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   }
 
   // ---------------------------
-  // تحميل شغل سائق محدد - من الكود القديم
+  // تحميل شغل سائق محدد
   // ---------------------------
   Future<void> _loadDriverWork(String driverName) async {
     setState(() {
@@ -2408,7 +2679,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   }
 
   // ---------------------------
-  // تصفية الشغل حسب التاريخ - من الكود القديم
+  // تصفية الشغل حسب التاريخ
   // ---------------------------
   List<Map<String, dynamic>> _filterWorkByDate(
     List<Map<String, dynamic>> workList,
@@ -2508,6 +2779,403 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   }
 
   // ---------------------------
+  // إنشاء PDF للتقرير
+  // ---------------------------
+  Future<void> _generatePDF() async {
+    if (_arabicFont == null) {
+      _showError('الخط العربي غير محمل');
+      return;
+    }
+
+    if (_selectedDriver == null || _filteredDriverWork.isEmpty) {
+      _showError('لا توجد بيانات للطباعة');
+      return;
+    }
+
+    setState(() => _isGeneratingPDF = true);
+
+    try {
+      // حساب الإجماليات
+      double totalKarta = 0;
+      double totalOhda = 0;
+      double totalNolon = 0;
+      double totalOvernight = 0;
+      double totalHoliday = 0;
+      int totalTrips = _filteredDriverWork.length;
+
+      for (final work in _filteredDriverWork) {
+        totalKarta += _parseToDouble(work['karta']);
+        totalOhda += _parseToDouble(work['ohda']);
+        totalNolon += _parseToDouble(work['wheelNolon']);
+        totalOvernight += _parseToDouble(work['wheelOvernight']);
+        totalHoliday += _parseToDouble(work['wheelHoliday']);
+      }
+
+      double netAmount =
+          (totalKarta + totalNolon + totalOvernight + totalHoliday) - totalOhda;
+
+      // إنشاء PDF
+      final pdf = pdfLib.Document(
+        theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
+      );
+
+      pdf.addPage(
+        pdfLib.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: pdfLib.EdgeInsets.all(20),
+          build: (context) => [
+            // العنوان الرئيسي
+            pdfLib.Directionality(
+              textDirection: pdfLib.TextDirection.rtl,
+              child: pdfLib.Column(
+                children: [
+                  pdfLib.Row(
+                    mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pdfLib.Text(
+                        'تقرير شغل السائقين',
+                        style: pdfLib.TextStyle(
+                          fontSize: 16,
+                          fontWeight: pdfLib.FontWeight.bold,
+                          font: _arabicFont,
+                          color: PdfColors.black,
+                        ),
+                      ),
+                      pdfLib.Text(
+                        DateFormat('yyyy/MM/dd').format(DateTime.now()),
+                        style: pdfLib.TextStyle(
+                          fontSize: 10,
+                          font: _arabicFont,
+                          color: PdfColors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pdfLib.Divider(color: PdfColors.black, thickness: 1),
+                ],
+              ),
+            ),
+            pdfLib.SizedBox(height: 10),
+
+            // معلومات السائق
+            _buildDriverInfoPdf(
+              _selectedDriver!,
+              totalTrips,
+              netAmount,
+              _selectedContractor ?? '',
+            ),
+            pdfLib.SizedBox(height: 15),
+
+            // الجدول
+            _buildPdfTable(_filteredDriverWork),
+            pdfLib.SizedBox(height: 10),
+
+            // الملخص
+            _buildSummaryPdf(
+              totalKarta,
+              totalOhda,
+              totalNolon,
+              totalOvernight,
+              totalHoliday,
+              netAmount,
+            ),
+          ],
+        ),
+      );
+
+      // طباعة PDF
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: _getPDFFileName(),
+      );
+    } catch (e) {
+      _showError('حدث خطأ في إنشاء PDF: $e');
+    } finally {
+      setState(() => _isGeneratingPDF = false);
+    }
+  }
+
+  // دالة مساعدة لتحويل إلى double
+  double _parseToDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      try {
+        return double.tryParse(value) ?? 0.0;
+      } catch (e) {
+        return 0.0;
+      }
+    }
+    return 0.0;
+  }
+
+  // بناء معلومات السائق للPDF
+  pdfLib.Widget _buildDriverInfoPdf(
+    String driverName,
+    int totalTrips,
+    double netAmount,
+    String contractor,
+  ) {
+    return pdfLib.Directionality(
+      textDirection: pdfLib.TextDirection.rtl,
+      child: pdfLib.Container(
+        padding: pdfLib.EdgeInsets.all(8),
+        decoration: pdfLib.BoxDecoration(
+          border: pdfLib.Border.all(color: PdfColors.blue, width: 0.5),
+          borderRadius: pdfLib.BorderRadius.circular(5),
+        ),
+        child: pdfLib.Column(
+          crossAxisAlignment: pdfLib.CrossAxisAlignment.start,
+          children: [
+            // اسم السائق وعدد الرحلات في نفس السطر
+            pdfLib.Row(
+              mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+              children: [
+                pdfLib.Text(
+                  'اسم السائق: $driverName',
+                  style: pdfLib.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                    color: PdfColors.black,
+                  ),
+                ),
+                pdfLib.Text(
+                  'عدد الرحلات: $totalTrips',
+                  style: pdfLib.TextStyle(
+                    fontSize: 10,
+                    font: _arabicFont,
+                    color: PdfColors.blue,
+                  ),
+                ),
+              ],
+            ),
+            pdfLib.SizedBox(height: 4),
+
+            // الصافي في السطر الثاني
+            pdfLib.Row(
+              mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+              children: [
+                pdfLib.Text(
+                  'الصافي: ${netAmount.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                    color: netAmount >= 0 ? PdfColors.green : PdfColors.red,
+                  ),
+                ),
+                if (contractor.isNotEmpty)
+                  pdfLib.Text(
+                    'المقاول: $contractor',
+                    style: pdfLib.TextStyle(
+                      fontSize: 10,
+                      font: _arabicFont,
+                      color: PdfColors.grey,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // بناء الجدول في PDF
+  pdfLib.Widget _buildPdfTable(List<Map<String, dynamic>> workList) {
+    return pdfLib.Directionality(
+      textDirection: pdfLib.TextDirection.rtl,
+      child: pdfLib.Table.fromTextArray(
+        border: pdfLib.TableBorder.all(color: PdfColors.grey, width: 0.5),
+        cellAlignment: pdfLib.Alignment.center,
+        headerDecoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
+        headerStyle: pdfLib.TextStyle(
+          fontSize: 9,
+          fontWeight: pdfLib.FontWeight.bold,
+          font: _arabicFont,
+          color: PdfColors.black,
+        ),
+        cellStyle: pdfLib.TextStyle(
+          fontSize: 8,
+          font: _arabicFont,
+          color: PdfColors.black,
+        ),
+        cellAlignments: {
+          0: pdfLib.Alignment.center, // م
+          1: pdfLib.Alignment.center, // التاريخ
+          2: pdfLib.Alignment.center, // من
+          3: pdfLib.Alignment.center, // إلى
+          4: pdfLib.Alignment.center, // العهدة
+          5: pdfLib.Alignment.center, // الكارتة
+          6: pdfLib.Alignment.center, // النولون
+          7: pdfLib.Alignment.center, // المبيت
+          8: pdfLib.Alignment.center, // العطلة
+        },
+        columnWidths: {
+          8: pdfLib.FlexColumnWidth(0.4), // م
+          7: pdfLib.FlexColumnWidth(1.0), // التاريخ
+          6: pdfLib.FlexColumnWidth(1.2), // من
+          5: pdfLib.FlexColumnWidth(1.2), // إلى
+          4: pdfLib.FlexColumnWidth(0.8), // العهدة
+          3: pdfLib.FlexColumnWidth(0.8), // الكارتة
+          2: pdfLib.FlexColumnWidth(0.8), // النولون
+          1: pdfLib.FlexColumnWidth(0.8), // المبيت
+          0: pdfLib.FlexColumnWidth(0.8), // العطلة
+        },
+        headers: [
+          'العطلة',
+          'المبيت',
+          'النولون',
+          'الكارتة',
+
+          'العهدة',
+          'إلى',
+
+          'من',
+          'التاريخ',
+
+          'م',
+        ],
+        data: List<List<String>>.generate(workList.length, (index) {
+          final work = workList[index];
+          final date = work['date'] as DateTime?;
+          return [
+            _parseToDouble(work['wheelHoliday']).toStringAsFixed(2),
+            _parseToDouble(work['wheelOvernight']).toStringAsFixed(2),
+            _parseToDouble(work['wheelNolon']).toStringAsFixed(2),
+            _parseToDouble(work['karta']).toStringAsFixed(2),
+            _parseToDouble(work['ohda']).toStringAsFixed(2),
+            work['unloadingLocation'] ?? '',
+            work['loadingLocation'] ?? '',
+            date != null ? DateFormat('dd/MM/yy').format(date) : '-',
+            (index + 1).toString(),
+          ];
+        }),
+      ),
+    );
+  }
+
+  // بناء ملخص الإجماليات للPDF
+  pdfLib.Widget _buildSummaryPdf(
+    double totalKarta,
+    double totalOhda,
+    double totalNolon,
+    double totalOvernight,
+    double totalHoliday,
+    double netAmount,
+  ) {
+    return pdfLib.Directionality(
+      textDirection: pdfLib.TextDirection.rtl,
+      child: pdfLib.Container(
+        padding: pdfLib.EdgeInsets.all(8),
+        decoration: pdfLib.BoxDecoration(
+          border: pdfLib.Border.all(color: PdfColors.black, width: 0.5),
+          borderRadius: pdfLib.BorderRadius.circular(5),
+        ),
+        child: pdfLib.Column(
+          crossAxisAlignment: pdfLib.CrossAxisAlignment.start,
+          children: [
+            pdfLib.Text(
+              'ملخص الإجماليات',
+              style: pdfLib.TextStyle(
+                fontSize: 10,
+                fontWeight: pdfLib.FontWeight.bold,
+                font: _arabicFont,
+                color: PdfColors.black,
+              ),
+            ),
+            pdfLib.SizedBox(height: 5),
+            pdfLib.Row(
+              mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+              children: [
+                pdfLib.Text(
+                  'إجمالي الكارتة: ${totalKarta.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 8,
+                    font: _arabicFont,
+                    color: PdfColors.black,
+                  ),
+                ),
+                pdfLib.Text(
+                  'إجمالي العهدة: ${totalOhda.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 8,
+                    font: _arabicFont,
+                    color: PdfColors.red,
+                  ),
+                ),
+              ],
+            ),
+            pdfLib.SizedBox(height: 3),
+            pdfLib.Row(
+              mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+              children: [
+                pdfLib.Text(
+                  'إجمالي النولون: ${totalNolon.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 8,
+                    font: _arabicFont,
+                    color: PdfColors.green,
+                  ),
+                ),
+                pdfLib.Text(
+                  'إجمالي المبيت: ${totalOvernight.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 8,
+                    font: _arabicFont,
+                    color: PdfColors.blue,
+                  ),
+                ),
+                pdfLib.Text(
+                  'إجمالي العطلة: ${totalHoliday.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 8,
+                    font: _arabicFont,
+                    color: PdfColors.orange,
+                  ),
+                ),
+              ],
+            ),
+            pdfLib.SizedBox(height: 5),
+            pdfLib.Divider(color: PdfColors.grey, thickness: 0.5),
+            pdfLib.Row(
+              mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+              children: [
+                pdfLib.Text(
+                  'الصافي النهائي:',
+                  style: pdfLib.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                    color: PdfColors.black,
+                  ),
+                ),
+                pdfLib.Text(
+                  '${netAmount.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                    color: netAmount >= 0 ? PdfColors.green : PdfColors.red,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // الحصول على اسم الملف
+  String _getPDFFileName() {
+    final now = DateTime.now();
+    final formattedDate = DateFormat('yyyyMMdd').format(now);
+    return 'تقرير_${_selectedDriver}_$formattedDate';
+  }
+
+  // ---------------------------
   // الرسائل
   // ---------------------------
   void _showError(String message) {
@@ -2536,7 +3204,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   }
 
   // ---------------------------
-  // AppBar
+  // AppBar بدون زر الطباعة
   // ---------------------------
   Widget _buildCustomAppBar() {
     String title = 'شغل السائقين';
@@ -2902,7 +3570,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   }
 
   // ---------------------------
-  // واجهة جدول شغل السائق - من الكود القديم (بدون تغييرات)
+  // واجهة جدول شغل السائق
   // ---------------------------
   Widget _buildWorkTable() {
     if (_isLoadingWork) return const Center(child: CircularProgressIndicator());
@@ -2973,7 +3641,6 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
                               TableCellHeader('عطلة العجل'),
                               TableCellHeader('مبيت العجل'),
                               TableCellHeader('نولون العجل'),
-                              // العمود المضاف
                               TableCellHeader('الكارتة'),
                               TableCellHeader('العهدة'),
                               TableCellHeader('اسم الموقع'),
@@ -2986,10 +3653,6 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
                           ..._filteredDriverWork.asMap().entries.map((entry) {
                             final index = entry.key;
                             final work = entry.value;
-                            final totalNolonRow =
-                                (work['wheelNolon'] ?? 0.0) +
-                                (work['wheelOvernight'] ?? 0.0) +
-                                (work['wheelHoliday'] ?? 0.0);
 
                             return TableRow(
                               decoration: BoxDecoration(
@@ -3018,13 +3681,6 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
                                     color: Colors.green,
                                   ),
                                 ),
-                                // TableCellBody(
-                                //   '${totalNolonRow.toStringAsFixed(2)} ج',
-                                //   textStyle: const TextStyle(
-                                //     fontWeight: FontWeight.bold,
-                                //     color: Colors.blue,
-                                //   ),
-                                // ), // إجمالي النولون للسطر
                                 TableCellBody(work['karta']),
                                 TableCellBody(work['ohda']),
                                 TableCellBody(
@@ -3067,7 +3723,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   }
 
   // ---------------------------
-  // قسم فلتر الوقت - من الكود القديم
+  // قسم فلتر الوقت
   // ---------------------------
   Widget _buildTimeFilterSection() {
     return Container(
@@ -3077,7 +3733,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
         children: [
           TextField(
             decoration: InputDecoration(
-              hintText: 'ابحث باسم السائق',
+              hintText: 'ابحث باسم المقاول',
               prefixIcon: const Icon(Icons.search, color: Color(0xFF3498DB)),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -3089,7 +3745,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
             ),
             onChanged: (value) {
               setState(() {
-                _searchDriverQuery = value;
+                _searchContractorQuery = value;
               });
             },
           ),
@@ -3141,7 +3797,7 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
   }
 
   // ---------------------------
-  // الواجهة الرئيسية
+  // الواجهة الرئيسية مع FloatingActionButton للطباعة
   // ---------------------------
   @override
   Widget build(BuildContext context) {
@@ -3154,28 +3810,50 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
             _buildTimeFilterSection(),
           Expanded(
             child: _selectedDriver != null
-                ? _buildWorkTable() // جدول شغل السائق (من الكود القديم)
+                ? _buildWorkTable()
                 : (_selectedContractor != null
                       ? _buildDriversList()
                       : _buildContractorsList()),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (_selectedDriver != null) {
-            _loadDriverWork(_selectedDriver!);
-          } else if (_selectedContractor != null) {
-            _loadDriversByContractor(_selectedContractor!);
-          } else {
-            _loadContractors();
-          }
-        },
-        backgroundColor: Color(0xFF3498DB),
-        tooltip: 'تحديث',
-        child: Icon(Icons.refresh, color: Colors.white),
-      ),
+      // هنا يتم التحكم في FloatingActionButton حسب الحالة
+      floatingActionButton: _getFloatingActionButton(),
     );
+  }
+
+  // دالة لإنشاء الـ FloatingActionButton المناسب
+  Widget? _getFloatingActionButton() {
+    // إذا كان هناك سائق محدد، أظهر زر الطباعة
+    if (_selectedDriver != null && _filteredDriverWork.isNotEmpty) {
+      return FloatingActionButton(
+        onPressed: _isGeneratingPDF ? null : _generatePDF,
+        backgroundColor: _isGeneratingPDF ? Colors.grey : Colors.red,
+        tooltip: 'طباعة التقرير',
+        child: _isGeneratingPDF
+            ? CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              )
+            : Icon(Icons.print, color: Colors.white),
+      );
+    }
+    // إذا لم يكن هناك سائق محدد، أظهر زر التحديث
+    // else {
+    //   return FloatingActionButton(
+    //     onPressed: () {
+    //       if (_selectedDriver != null) {
+    //         _loadDriverWork(_selectedDriver!);
+    //       } else if (_selectedContractor != null) {
+    //         _loadDriversByContractor(_selectedContractor!);
+    //       } else {
+    //         _loadContractors();
+    //       }
+    //     },
+    //     backgroundColor: Color(0xFF3498DB),
+    //     tooltip: 'تحديث',
+    //     child: Icon(Icons.refresh, color: Colors.white),
+    //   );
+    // }
   }
 }
 

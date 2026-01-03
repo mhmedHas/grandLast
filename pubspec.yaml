@@ -28,6 +28,8 @@ flutter:
   # هنا قسم الأصول والخطوط
   assets:
     - assets/fonts/Amiri/Amiri-Regular.ttf
+    - assets/image/logoo.jpeg
+
 
   fonts:
     - family: Amiri

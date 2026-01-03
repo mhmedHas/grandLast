@@ -1879,21 +1879,53 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                 const SizedBox(height: 16),
 
                 // زر الإغلاق
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3498DB),
-                    foregroundColor: Colors.white,
-                    elevation: 2,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 12,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () => _generatePDF(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 255, 0, 0),
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.print,
+                            color: const Color.fromARGB(255, 255, 255, 255),
+                          ),
+
+                          // Text('طباعه'),
+                        ],
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                    SizedBox(width: 10),
+
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3498DB),
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('إغلاق'),
                     ),
-                  ),
-                  child: const Text('إغلاق'),
+                  ],
                 ),
               ],
             ),
