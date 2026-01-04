@@ -11,6 +11,7 @@ import 'package:last/screens/3section/company_partners.dart';
 import 'package:last/screens/3section/kazna/kazna_home.dart';
 import 'package:last/screens/3section/mony_head.dart';
 import 'package:last/screens/3section/nasriat.dart';
+import 'package:last/screens/3section/sallaff.dart';
 import 'screens/1section/company.dart';
 import 'screens/1section/prices.dart';
 
@@ -56,7 +57,8 @@ class _MainDashboardState extends State<MainDashboard> {
     CompanyMainPage(),
     DriverMainPage(), // المصروفات
 
-    ExpensesPage(), // النثرسات
+    ExpensesPage(),
+    LoansPage(), // النثرسات
     MainTreasuryPage(), // الضرائب
     TaxesPage(), // الملخص الشهري
     MonthlyProfitsPage(),
@@ -74,6 +76,8 @@ class _MainDashboardState extends State<MainDashboard> {
     'شغل الشركات',
     'شغل السائقين',
     'النثرياات',
+    'السلف',
+
     'الخزينة',
     'الضرائب',
 
@@ -91,6 +95,8 @@ class _MainDashboardState extends State<MainDashboard> {
     Icons.business_center,
     Icons.directions_car,
     Icons.receipt_long,
+    Icons.kayaking_sharp,
+
     Icons.gavel,
     Icons.assessment,
     Icons.summarize,
