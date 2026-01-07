@@ -1473,6 +1473,181 @@ class _IncomePageState extends State<IncomePage> {
               ],
 
               // قسم باقي الإيرادات
+              // Card(
+              //   elevation: 3,
+              //   shape: RoundedRectangleBorder(
+              //     borderRadius: BorderRadius.circular(12),
+              //   ),
+              //   child: Padding(
+              //     padding: const EdgeInsets.all(16),
+              //     child: Column(
+              //       crossAxisAlignment: CrossAxisAlignment.start,
+              //       children: [
+              //         Row(
+              //           children: [
+              //             Icon(Icons.list, color: Color(0xFF1B4F72), size: 24),
+              //             SizedBox(width: 8),
+              //             Text(
+              //               'سجل الإيرادات',
+              //               style: TextStyle(
+              //                 fontSize: 18,
+              //                 fontWeight: FontWeight.bold,
+              //                 color: Color(0xFF1B4F72),
+              //               ),
+              //             ),
+              //           ],
+              //         ),
+              //         SizedBox(height: 12),
+              //         Divider(color: Colors.grey[300]),
+              //         SizedBox(height: 8),
+              //         ...otherEntries.map((doc) {
+              //           final data = doc.data() as Map<String, dynamic>;
+              //           final date = (data['date'] as Timestamp).toDate();
+              //           final entryType = data['entryType'] as String;
+              //           final amount = (data['amount'] as num).toDouble();
+              //           final isCleared = data['isCleared'] ?? true;
+
+              //           return Container(
+              //             margin: EdgeInsets.only(bottom: 8),
+              //             decoration: BoxDecoration(
+              //               border: Border(
+              //                 bottom: BorderSide(color: Colors.grey[200]!),
+              //               ),
+              //             ),
+              //             child: ListTile(
+              //               contentPadding: EdgeInsets.zero,
+              //               leading: CircleAvatar(
+              //                 backgroundColor: _getTypeColor(
+              //                   entryType,
+              //                 ).withOpacity(0.1),
+              //                 child: Icon(
+              //                   _getTypeIcon(entryType),
+              //                   color: _getTypeColor(entryType),
+              //                   size: 22,
+              //                 ),
+              //               ),
+              //               title: Row(
+              //                 children: [
+              //                   Expanded(
+              //                     child: Text(
+              //                       entryType,
+              //                       style: TextStyle(
+              //                         fontWeight: FontWeight.bold,
+              //                         fontSize: 16,
+              //                       ),
+              //                     ),
+              //                   ),
+              //                   Text(
+              //                     '${amount.toStringAsFixed(2)} ج',
+              //                     style: TextStyle(
+              //                       fontWeight: FontWeight.bold,
+              //                       color: Colors.green[700],
+              //                       fontSize: 16,
+              //                     ),
+              //                   ),
+              //                 ],
+              //               ),
+              //               subtitle: Column(
+              //                 crossAxisAlignment: CrossAxisAlignment.start,
+              //                 children: [
+              //                   SizedBox(height: 4),
+              //                   Text(
+              //                     DateFormat(
+              //                       'yyyy/MM/dd - hh:mm a',
+              //                     ).format(date),
+              //                     style: TextStyle(
+              //                       fontSize: 13,
+              //                       color: Colors.grey[600],
+              //                     ),
+              //                   ),
+              //                   if (data['description'] != null &&
+              //                       data['description'].isNotEmpty)
+              //                     Padding(
+              //                       padding: const EdgeInsets.only(top: 4),
+              //                       child: Text(
+              //                         data['description'],
+              //                         style: TextStyle(
+              //                           fontSize: 13,
+              //                           color: Colors.grey[700],
+              //                         ),
+              //                       ),
+              //                     ),
+              //                   if (!isCleared)
+              //                     Container(
+              //                       margin: const EdgeInsets.only(top: 4),
+              //                       padding: const EdgeInsets.symmetric(
+              //                         horizontal: 8,
+              //                         vertical: 2,
+              //                       ),
+              //                       decoration: BoxDecoration(
+              //                         color: Colors.orange.withOpacity(0.1),
+              //                         borderRadius: BorderRadius.circular(4),
+              //                       ),
+              //                       child: Text(
+              //                         'معلق',
+              //                         style: TextStyle(
+              //                           color: Colors.orange,
+              //                           fontSize: 11,
+              //                           fontWeight: FontWeight.bold,
+              //                         ),
+              //                       ),
+              //                     ),
+              //                 ],
+              //               ),
+              //               trailing: PopupMenuButton<String>(
+              //                 icon: Icon(
+              //                   Icons.more_vert,
+              //                   color: Colors.grey[600],
+              //                 ),
+              //                 itemBuilder: (context) => [
+              //                   PopupMenuItem(
+              //                     value: 'edit',
+              //                     child: Row(
+              //                       children: [
+              //                         Icon(
+              //                           Icons.edit,
+              //                           size: 18,
+              //                           color: Colors.blue,
+              //                         ),
+              //                         SizedBox(width: 8),
+              //                         Text(
+              //                           'تعديل',
+              //                           style: TextStyle(color: Colors.blue),
+              //                         ),
+              //                       ],
+              //                     ),
+              //                   ),
+              //                   PopupMenuItem(
+              //                     value: 'delete',
+              //                     child: Row(
+              //                       children: [
+              //                         Icon(
+              //                           Icons.delete,
+              //                           color: Colors.red,
+              //                           size: 18,
+              //                         ),
+              //                         SizedBox(width: 8),
+              //                         Text(
+              //                           'حذف',
+              //                           style: TextStyle(color: Colors.red),
+              //                         ),
+              //                       ],
+              //                     ),
+              //                   ),
+              //                 ],
+              //                 onSelected: (value) {
+              //                   if (value == 'delete') {
+              //                     _confirmDelete(doc.id, entryType, amount);
+              //                   }
+              //                 },
+              //               ),
+              //             ),
+              //           );
+              //         }),
+              //       ],
+              //     ),
+              //   ),
+              // ),
               Card(
                 elevation: 3,
                 shape: RoundedRectangleBorder(
@@ -1502,10 +1677,21 @@ class _IncomePageState extends State<IncomePage> {
                       SizedBox(height: 8),
                       ...otherEntries.map((doc) {
                         final data = doc.data() as Map<String, dynamic>;
-                        final date = (data['date'] as Timestamp).toDate();
-                        final entryType = data['entryType'] as String;
-                        final amount = (data['amount'] as num).toDouble();
+                        final dateTimestamp = data['date'] as Timestamp?;
+                        final date = dateTimestamp?.toDate() ?? DateTime.now();
+
+                        // التحقق من وجود entryType وعرض قيمة بديلة إذا كانت null
+                        final entryType =
+                            data['entryType']?.toString() ?? 'غير محدد';
+
+                        final amountNum = data['amount'];
+                        final amount = amountNum != null
+                            ? (amountNum as num).toDouble()
+                            : 0.0;
+
                         final isCleared = data['isCleared'] ?? true;
+                        final description =
+                            data['description']?.toString() ?? '';
 
                         return Container(
                           margin: EdgeInsets.only(bottom: 8),
@@ -1560,12 +1746,11 @@ class _IncomePageState extends State<IncomePage> {
                                     color: Colors.grey[600],
                                   ),
                                 ),
-                                if (data['description'] != null &&
-                                    data['description'].isNotEmpty)
+                                if (description.isNotEmpty)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Text(
-                                      data['description'],
+                                      description,
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: Colors.grey[700],

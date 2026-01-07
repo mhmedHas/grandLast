@@ -308,6 +308,303 @@
 //     );
 //   }
 
+//   // ================= إنشاء PDF =================
+
+//   // ================== GENERATE PDF ==================
+//   Future<void> _generatePDF() async {
+//     if (_arabicFont == null) {
+//       ScaffoldMessenger.of(
+//         context,
+//       ).showSnackBar(const SnackBar(content: Text('الخط العربي غير محمل')));
+//       return;
+//     }
+
+//     setState(() => _isGeneratingPDF = true);
+
+//     try {
+//       final loans = await _fetchLoansForPDF();
+
+//       if (loans.isEmpty) {
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(const SnackBar(content: Text('لا توجد سلفات للطباعة')));
+//         return;
+//       }
+
+//       final pdf = pdfLib.Document(
+//         theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
+//       );
+
+//       pdf.addPage(
+//         pdfLib.MultiPage(
+//           pageFormat: PdfPageFormat.a4,
+//           margin: const pdfLib.EdgeInsets.all(15),
+//           build: (context) => [
+//             _buildPdfHeader(),
+//             pdfLib.SizedBox(height: 8),
+//             _buildPdfTitle(),
+//             pdfLib.SizedBox(height: 12),
+//             _buildPdfTable(loans),
+//             pdfLib.SizedBox(height: 12),
+//             _buildPdfTotalSection(loans),
+//           ],
+//         ),
+//       );
+
+//       await Printing.layoutPdf(
+//         name: 'السلفات_${_getPDFFileName()}',
+//         onLayout: (format) async => pdf.save(),
+//       );
+//     } catch (e) {
+//       ScaffoldMessenger.of(
+//         context,
+//       ).showSnackBar(SnackBar(content: Text('خطأ في إنشاء PDF: $e')));
+//     } finally {
+//       setState(() => _isGeneratingPDF = false);
+//     }
+//   }
+
+//   // ================== FETCH DATA ==================
+//   Future<List<Map<String, dynamic>>> _fetchLoansForPDF() async {
+//     try {
+//       final snapshot = await _firestore
+//           .collection("loans")
+//           .orderBy('date', descending: true)
+//           .get();
+
+//       final List<Map<String, dynamic>> loans = [];
+
+//       for (var doc in snapshot.docs) {
+//         final data = doc.data() as Map<String, dynamic>;
+//         final date = (data['date'] as Timestamp).toDate();
+
+//         if (_applyPDFFilter(date)) {
+//           loans.add({
+//             'id': doc.id,
+//             'recipient': data['recipient'] ?? '',
+//             'amount': data['amount'] ?? 0.0,
+//             'paymentType': data['paymentType'] ?? 'نقدي',
+//             'note': data['note'] ?? '',
+//             'formattedDate': DateFormat('yyyy/MM/dd').format(date),
+//           });
+//         }
+//       }
+//       return loans;
+//     } catch (e) {
+//       debugPrint('PDF Error: $e');
+//       return [];
+//     }
+//   }
+
+//   // ================== FILTER ==================
+//   bool _applyPDFFilter(DateTime date) {
+//     final now = DateTime.now();
+//     switch (_timeFilter) {
+//       case 'اليوم':
+//         return date.year == now.year &&
+//             date.month == now.month &&
+//             date.day == now.day;
+//       case 'هذا الشهر':
+//         return date.year == now.year && date.month == now.month;
+//       case 'هذه السنة':
+//         return date.year == now.year;
+//       case 'مخصص':
+//         return date.month == _selectedMonth && date.year == _selectedYear;
+//       default:
+//         return true;
+//     }
+//   }
+
+//   // ================== HEADER ==================
+//   pdfLib.Widget _buildPdfHeader() {
+//     return pdfLib.Directionality(
+//       textDirection: pdfLib.TextDirection.rtl,
+//       child: pdfLib.Column(
+//         children: [
+//           pdfLib.Row(
+//             mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+//             children: [
+//               pdfLib.Text(
+//                 'FN 455.5 - 203/317/22',
+//                 style: pdfLib.TextStyle(
+//                   fontSize: 12,
+//                   fontWeight: pdfLib.FontWeight.bold,
+//                   font: _arabicFont,
+//                 ),
+//               ),
+//               pdfLib.Text(
+//                 'سجل السلفات',
+//                 style: pdfLib.TextStyle(
+//                   fontSize: 18,
+//                   fontWeight: pdfLib.FontWeight.bold,
+//                   font: _arabicFont,
+//                 ),
+//               ),
+//             ],
+//           ),
+//           pdfLib.Divider(thickness: 1.5),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // ================== TITLE ==================
+//   pdfLib.Widget _buildPdfTitle() {
+//     return pdfLib.Directionality(
+//       textDirection: pdfLib.TextDirection.rtl,
+//       child: pdfLib.Column(
+//         children: [
+//           pdfLib.Text(
+//             'السلفات لشهر $_selectedMonth',
+//             style: pdfLib.TextStyle(
+//               fontSize: 14,
+//               fontWeight: pdfLib.FontWeight.bold,
+//               font: _arabicFont,
+//             ),
+//           ),
+//           pdfLib.SizedBox(height: 4),
+//           pdfLib.Text(
+//             'تاريخ الطباعة: ${DateFormat('yyyy/MM/dd').format(DateTime.now())}',
+//             style: pdfLib.TextStyle(fontSize: 11, font: _arabicFont),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // ================== TABLE ==================
+//   pdfLib.Widget _buildPdfTable(List<Map<String, dynamic>> loans) {
+//     return pdfLib.Directionality(
+//       textDirection: pdfLib.TextDirection.rtl,
+//       child: pdfLib.Transform.scale(
+//         scale: 0.9,
+//         child: pdfLib.Table(
+//           border: pdfLib.TableBorder.all(width: 1),
+//           columnWidths: const {
+//             0: pdfLib.FlexColumnWidth(2.5),
+//             1: pdfLib.FlexColumnWidth(1.3),
+//             2: pdfLib.FlexColumnWidth(1.2),
+//             3: pdfLib.FlexColumnWidth(1.3),
+//             4: pdfLib.FlexColumnWidth(1.7),
+//             5: pdfLib.FlexColumnWidth(0.6),
+//           },
+//           children: [
+//             pdfLib.TableRow(
+//               decoration: const pdfLib.BoxDecoration(color: PdfColors.grey300),
+//               children: [
+//                 _buildPdfHeaderCell('ملاحظات'),
+//                 _buildPdfHeaderCell('الدفع'),
+//                 _buildPdfHeaderCell('المبلغ'),
+//                 _buildPdfHeaderCell('التاريخ'),
+//                 _buildPdfHeaderCell('المستلم'),
+//                 _buildPdfHeaderCell('م'),
+//               ],
+//             ),
+//             ...loans.asMap().entries.map((e) {
+//               final i = e.key + 1;
+//               final l = e.value;
+//               return pdfLib.TableRow(
+//                 children: [
+//                   _buildPdfDataCell(
+//                     l['note'].isEmpty ? '-' : l['note'],
+//                     align: pdfLib.TextAlign.right,
+//                   ),
+//                   _buildPdfDataCell(l['paymentType']),
+//                   _buildPdfDataCell(
+//                     (l['amount'] as double).toStringAsFixed(2),
+//                     bold: true,
+//                   ),
+//                   _buildPdfDataCell(l['formattedDate']),
+//                   _buildPdfDataCell(
+//                     l['recipient'],
+//                     align: pdfLib.TextAlign.right,
+//                   ),
+//                   _buildPdfDataCell(i.toString()),
+//                 ],
+//               );
+//             }).toList(),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // ================== TOTAL ==================
+//   pdfLib.Widget _buildPdfTotalSection(List<Map<String, dynamic>> loans) {
+//     final total = loans.fold(0.0, (s, l) => s + (l['amount'] as double));
+
+//     return pdfLib.Directionality(
+//       textDirection: pdfLib.TextDirection.rtl,
+//       child: pdfLib.Container(
+//         padding: const pdfLib.EdgeInsets.all(8),
+//         decoration: pdfLib.BoxDecoration(border: pdfLib.Border.all()),
+//         child: pdfLib.Row(
+//           mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+//           children: [
+//             pdfLib.Text(
+//               'الإجمالي',
+//               style: pdfLib.TextStyle(
+//                 fontSize: 13,
+//                 fontWeight: pdfLib.FontWeight.bold,
+//                 font: _arabicFont,
+//               ),
+//             ),
+//             pdfLib.Text(
+//               '${total.toStringAsFixed(2)} ج',
+//               style: pdfLib.TextStyle(
+//                 fontSize: 14,
+//                 fontWeight: pdfLib.FontWeight.bold,
+//                 font: _arabicFont,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // ================== CELLS ==================
+//   pdfLib.Widget _buildPdfHeaderCell(String text) {
+//     return pdfLib.Padding(
+//       padding: const pdfLib.EdgeInsets.all(4),
+//       child: pdfLib.Text(
+//         text,
+//         textAlign: pdfLib.TextAlign.center,
+//         style: pdfLib.TextStyle(
+//           fontSize: 11,
+//           fontWeight: pdfLib.FontWeight.bold,
+//           font: _arabicFont,
+//         ),
+//       ),
+//     );
+//   }
+
+//   pdfLib.Widget _buildPdfDataCell(
+//     String text, {
+//     pdfLib.TextAlign align = pdfLib.TextAlign.center,
+//     bool bold = false,
+//   }) {
+//     return pdfLib.Padding(
+//       padding: const pdfLib.EdgeInsets.all(4),
+//       child: pdfLib.Text(
+//         text,
+//         maxLines: 2,
+//         overflow: pdfLib.TextOverflow.clip,
+//         textAlign: align,
+//         style: pdfLib.TextStyle(
+//           fontSize: 10,
+//           fontWeight: bold ? pdfLib.FontWeight.bold : pdfLib.FontWeight.normal,
+//           font: _arabicFont,
+//         ),
+//       ),
+//     );
+//   }
+
+//   // ================== FILE NAME ==================
+//   String _getPDFFileName() {
+//     return DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+//   }
+
 //   // ================= فتح نافذة إضافة/تعديل =================
 //   Future<void> _openLoanSheet({
 //     String? docId,
@@ -1186,22 +1483,37 @@
 //           ),
 //         ],
 //       ),
-//       floatingActionButton: FloatingActionButton.extended(
-//         onPressed: () {
-//           if (_treasuryBalance <= 0) {
-//             ScaffoldMessenger.of(context).showSnackBar(
-//               const SnackBar(
-//                 content: Text("لا يمكن إضافة سلفة - رصيد الخزنة غير كافي"),
-//                 backgroundColor: Colors.red,
-//               ),
-//             );
-//             return;
-//           }
-//           _openLoanSheet();
-//         },
-//         icon: const Icon(Icons.add),
-//         label: const Text("إضافة سلفة"),
-//         backgroundColor: const Color(0xFF27AE60),
+//       floatingActionButton: Row(
+//         mainAxisAlignment: MainAxisAlignment.end,
+//         children: [
+//           FloatingActionButton(
+//             heroTag: 'pdf_btn_loans',
+//             onPressed: _isGeneratingPDF ? null : _generatePDF,
+//             backgroundColor: _isGeneratingPDF ? Colors.grey : Colors.red,
+//             mini: true,
+//             child: _isGeneratingPDF
+//                 ? const CircularProgressIndicator(color: Colors.white)
+//                 : const Icon(Icons.picture_as_pdf, color: Colors.white),
+//           ),
+//           const SizedBox(width: 10),
+//           FloatingActionButton.extended(
+//             onPressed: () {
+//               if (_treasuryBalance <= 0) {
+//                 ScaffoldMessenger.of(context).showSnackBar(
+//                   const SnackBar(
+//                     content: Text("لا يمكن إضافة سلفة - رصيد الخزنة غير كافي"),
+//                     backgroundColor: Colors.red,
+//                   ),
+//                 );
+//                 return;
+//               }
+//               _openLoanSheet();
+//             },
+//             icon: const Icon(Icons.add),
+//             label: const Text("إضافة سلفة"),
+//             backgroundColor: const Color(0xFF27AE60),
+//           ),
+//         ],
 //       ),
 //     );
 //   }
@@ -1213,6 +1525,7 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pdfLib;
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/widgets.dart' as x;
 
 class LoansPage extends StatefulWidget {
   const LoansPage({super.key});
@@ -1226,6 +1539,8 @@ class _LoansPageState extends State<LoansPage> {
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
+  final TextEditingController _paymentAmountController =
+      TextEditingController();
 
   // ================= أنواع الدفع =================
   final List<Map<String, dynamic>> _paymentTypes = [
@@ -1235,10 +1550,12 @@ class _LoansPageState extends State<LoansPage> {
   ];
 
   String selectedPaymentType = "نقدي";
+  String selectedPaymentTypeForSettlement = "نقدي";
   DateTime selectedDate = DateTime.now();
   String _editingDocId = "";
   bool _isLoading = false;
   bool _isGeneratingPDF = false;
+  bool _isProcessingPayment = false;
   String _timeFilter = 'الكل';
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
@@ -1348,9 +1665,13 @@ class _LoansPageState extends State<LoansPage> {
       final loanData = {
         "recipient": _recipientController.text,
         "amount": amount,
+        "originalAmount": amount, // لحفظ المبلغ الأصلي
+        "paidAmount": 0.0, // المبلغ المدفوع
+        "remainingAmount": amount, // المبلغ المتبقي
         "paymentType": selectedPaymentType,
         "note": _noteController.text,
         "date": Timestamp.fromDate(selectedDate),
+        "status": "مستحقة", // مستحقة، مدفوعة جزئياً، مكتملة
         "updatedAt": Timestamp.now(),
         "createdAt": Timestamp.now(),
       };
@@ -1389,11 +1710,16 @@ class _LoansPageState extends State<LoansPage> {
         );
       } else {
         // ========== تحديث موجود ==========
-        final oldAmount = (oldData!['amount'] as num).toDouble();
+        final oldAmount =
+            (oldData!['originalAmount'] ?? oldData['amount'] as num).toDouble();
         final amountDifference = amount - oldAmount;
 
         // 1. تحديث في السلف
-        await _firestore.collection("loans").doc(docId).update(loanData);
+        await _firestore.collection("loans").doc(docId).update({
+          ...loanData,
+          'originalAmount': amount,
+          'remainingAmount': amount - (oldData['paidAmount'] ?? 0.0),
+        });
 
         // 2. تحديث في الخزنة (بنفس طريقة النثريات)
         final exitSnapshot = await _firestore
@@ -1454,19 +1780,541 @@ class _LoansPageState extends State<LoansPage> {
     }
   }
 
+  // ================= سداد السلفة =================
+  Future<void> _makePayment(String docId, Map<String, dynamic> loanData) async {
+    final recipient = loanData['recipient'] ?? '';
+    final remainingAmount =
+        (loanData['remainingAmount'] ?? loanData['amount'] as num).toDouble();
+    final paidAmount = (loanData['paidAmount'] ?? 0.0) as double;
+    final originalAmount =
+        (loanData['originalAmount'] ?? loanData['amount'] as num).toDouble();
+    String paymentType = 'كامل'; // كامل أو جزئي
+    double paymentAmount = remainingAmount; // القيمة الافتراضية كاملة
+
+    if (remainingAmount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("هذه السلفة مدفوعة بالكامل")),
+      );
+      return;
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Directionality(
+            textDirection: x.TextDirection.rtl,
+            child: AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.payment, color: Colors.green),
+                  SizedBox(width: 8),
+                  Text('سداد سلفة - $recipient'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // معلومات السلفة
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('المبلغ الأصلي:'),
+                              Text(
+                                '${originalAmount.toStringAsFixed(2)} ج',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('المدفوع:'),
+                              Text(
+                                '${paidAmount.toStringAsFixed(2)} ج',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('المتبقي:'),
+                              Text(
+                                '${remainingAmount.toStringAsFixed(2)} ج',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 16),
+
+                    // نوع السداد
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        ChoiceChip(
+                          label: Text('دفع كامل'),
+                          selected: paymentType == 'كامل',
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                paymentType = 'كامل';
+                                _paymentAmountController.text = remainingAmount
+                                    .toStringAsFixed(2);
+                              });
+                            }
+                          },
+                          selectedColor: Colors.green,
+                          labelStyle: TextStyle(
+                            color: paymentType == 'كامل'
+                                ? Colors.white
+                                : Colors.green,
+                          ),
+                        ),
+                        ChoiceChip(
+                          label: Text('دفع جزئي'),
+                          selected: paymentType == 'جزئي',
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                paymentType = 'جزئي';
+                                _paymentAmountController.clear();
+                              });
+                            }
+                          },
+                          selectedColor: Colors.blue,
+                          labelStyle: TextStyle(
+                            color: paymentType == 'جزئي'
+                                ? Colors.white
+                                : Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+
+                    // مبلغ السداد
+                    TextFormField(
+                      controller: _paymentAmountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: paymentType == 'كامل'
+                            ? 'المبلغ الكامل'
+                            : 'المبلغ المطلوب دفعه',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        prefixIcon: Icon(Icons.attach_money),
+                        suffixText: 'ج',
+                      ),
+                      onChanged: (value) {
+                        if (value.isNotEmpty) {
+                          final enteredAmount = double.tryParse(value) ?? 0.0;
+                          if (enteredAmount == remainingAmount) {
+                            setState(() => paymentType = 'كامل');
+                          } else if (enteredAmount > 0 &&
+                              enteredAmount < remainingAmount) {
+                            setState(() => paymentType = 'جزئي');
+                          }
+                        }
+                      },
+                    ),
+                    SizedBox(height: 16),
+
+                    // طريقة الدفع للسداد
+                    DropdownButtonFormField<String>(
+                      value: selectedPaymentTypeForSettlement,
+                      decoration: InputDecoration(
+                        labelText: "طريقة السداد",
+                        prefixIcon: Icon(Icons.payment, color: Colors.purple),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      items: _paymentTypes.map((type) {
+                        return DropdownMenuItem<String>(
+                          value: type['name'],
+                          child: Row(
+                            children: [
+                              Icon(
+                                type['icon'],
+                                color: type['color'],
+                                size: 20,
+                              ),
+                              SizedBox(width: 12),
+                              Text(type['name']),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedPaymentTypeForSettlement = value;
+                          });
+                        }
+                      },
+                    ),
+                    SizedBox(height: 16),
+
+                    // ملاحظات السداد
+                    TextField(
+                      controller: _noteController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: "ملاحظات السداد",
+                        prefixIcon: Icon(Icons.note, color: Colors.orange),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        hintText: "أضف ملاحظات حول عملية السداد...",
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _paymentAmountController.clear();
+                    _noteController.clear();
+                  },
+                  child: Text('إلغاء'),
+                ),
+                ElevatedButton(
+                  onPressed: _isProcessingPayment
+                      ? null
+                      : () async {
+                          final paymentAmount =
+                              double.tryParse(_paymentAmountController.text) ??
+                              0.0;
+
+                          if (paymentAmount <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("أدخل مبلغ صحيح")),
+                            );
+                            return;
+                          }
+
+                          if (paymentAmount > remainingAmount) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("المبلغ أكبر من المبلغ المتبقي"),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // تأكيد السداد
+                          final confirmed = await _showPaymentConfirmation(
+                            recipient: recipient,
+                            amount: paymentAmount,
+                            paymentType: paymentType,
+                            paymentMethod: selectedPaymentTypeForSettlement,
+                          );
+
+                          if (confirmed) {
+                            setState(() => _isProcessingPayment = true);
+                            await _processPayment(
+                              docId,
+                              loanData,
+                              paymentAmount,
+                              paymentType,
+                              selectedPaymentTypeForSettlement,
+                            );
+                            setState(() => _isProcessingPayment = false);
+                            Navigator.pop(context);
+                            _paymentAmountController.clear();
+                            _noteController.clear();
+                          }
+                        },
+                  child: _isProcessingPayment
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text('سداد ($paymentType)'),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ================= تأكيد السداد =================
+  Future<bool> _showPaymentConfirmation({
+    required String recipient,
+    required double amount,
+    required String paymentType,
+    required String paymentMethod,
+  }) async {
+    bool confirmed = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: x.TextDirection.rtl,
+        child: AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.payment, color: Colors.green),
+              SizedBox(width: 8),
+              Text('تأكيد السداد'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('هل أنت متأكد من سداد ${amount.toStringAsFixed(2)} ج'),
+              Text('لـ $recipient؟'),
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'تفاصيل السداد ($paymentType)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text('المستلم: $recipient'),
+                    Text('المبلغ: ${amount.toStringAsFixed(2)} ج'),
+                    Text('نوع السداد: $paymentType'),
+                    Text('طريقة الدفع: $paymentMethod'),
+                    Text(
+                      'التاريخ: ${DateFormat('yyyy/MM/dd').format(DateTime.now())}',
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'سيتم إضافة المبلغ للخزنة تلقائياً',
+                  style: TextStyle(color: Colors.blue[800]),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                confirmed = true;
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: Text('تأكيد السداد ($paymentType)'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return confirmed;
+  }
+
+  // ================= معالجة عملية السداد =================
+  Future<void> _processPayment(
+    String docId,
+    Map<String, dynamic> loanData,
+    double paymentAmount,
+    String paymentType,
+    String paymentMethod,
+  ) async {
+    try {
+      final originalAmount =
+          (loanData['originalAmount'] ?? loanData['amount'] as num).toDouble();
+      final currentPaidAmount = (loanData['paidAmount'] ?? 0.0) as double;
+      final currentRemainingAmount =
+          (loanData['remainingAmount'] ?? loanData['amount'] as num).toDouble();
+
+      final newPaidAmount = currentPaidAmount + paymentAmount;
+      final newRemainingAmount = originalAmount - newPaidAmount;
+
+      // تحديث حالة السلفة
+      String newStatus;
+      if (newRemainingAmount <= 0) {
+        newStatus = 'مكتملة';
+      } else if (newPaidAmount > 0 && newRemainingAmount > 0) {
+        newStatus = 'مدفوعة جزئياً';
+      } else {
+        newStatus = 'مستحقة';
+      }
+
+      // 1. تحديث السلفة
+      await _firestore.collection("loans").doc(docId).update({
+        'paidAmount': newPaidAmount,
+        'remainingAmount': newRemainingAmount,
+        'status': newStatus,
+        'lastPaymentDate': Timestamp.now(),
+        'lastPaymentAmount': paymentAmount,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // 2. إضافة دفعة جديدة في مجموعة منفصلة للسداد
+      final paymentData = {
+        'loanId': docId,
+        'recipient': loanData['recipient'],
+        'amount': paymentAmount,
+        'paymentType': paymentMethod,
+        'note': _noteController.text.isNotEmpty
+            ? _noteController.text
+            : 'سداد سلفة',
+        'date': Timestamp.now(),
+        'createdAt': Timestamp.now(),
+        'settlementType': paymentType,
+      };
+
+      await _firestore.collection("loan_payments").add(paymentData);
+
+      // 3. إضافة المبلغ للخزنة كدخل
+      final treasuryEntryData = {
+        'amount': paymentAmount,
+
+        'description': 'سداد سلفة من ${loanData['recipient']} ($paymentType)',
+        'entryType': 'سداد سلفة',
+        'date': Timestamp.now(),
+        'createdAt': Timestamp.now(),
+        'category': 'دخل',
+        'status': 'مكتمل',
+        'recipient': loanData['recipient'],
+        'paymentType': paymentMethod,
+        'sourceId': docId,
+        'note': _noteController.text.isNotEmpty
+            ? _noteController.text
+            : 'سداد سلفة',
+      };
+
+      await _firestore.collection('treasury_entries').add(treasuryEntryData);
+
+      // 4. تحديث رصيد الخزنة
+      setState(() => _treasuryBalance += paymentAmount);
+
+      // 5. إضافة ملاحظة في السلفة الرئيسية
+      if (_noteController.text.isNotEmpty) {
+        final List<dynamic> existingNotes = loanData['paymentNotes'] ?? [];
+        existingNotes.add({
+          'date': Timestamp.now(),
+          'amount': paymentAmount,
+          'note': _noteController.text,
+          'type': 'سداد',
+        });
+
+        await _firestore.collection("loans").doc(docId).update({
+          'paymentNotes': existingNotes,
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تم سداد ${paymentAmount.toStringAsFixed(2)} ج بنجاح ($paymentType)',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // إعادة تحميل البيانات
+      _loadTreasuryBalance();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطأ في عملية السداد: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   // ================= حذف سلفة مع ربط بالخزنة =================
   Future<void> _confirmDelete(
     String docId,
     String recipient,
     double amount,
+    double paidAmount,
   ) async {
     return showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text("تأكيد الحذف"),
-          content: Text(
-            "هل أنت متأكد من حذف سلفة '$recipient' بقيمة ${amount.toStringAsFixed(2)} ج؟",
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "هل أنت متأكد من حذف سلفة '$recipient'؟",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text("المبلغ الأصلي: ${amount.toStringAsFixed(2)} ج"),
+              Text("المبلغ المدفوع: ${paidAmount.toStringAsFixed(2)} ج"),
+              Text(
+                "المبلغ المتبقي: ${(amount - paidAmount).toStringAsFixed(2)} ج",
+              ),
+              SizedBox(height: 12),
+              if (paidAmount > 0)
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'تحذير: هناك مدفوعات مسجلة لهذه السلفة',
+                    style: TextStyle(color: Colors.orange[800]),
+                  ),
+                ),
+            ],
           ),
           actions: [
             TextButton(
@@ -1489,17 +2337,30 @@ class _LoansPageState extends State<LoansPage> {
                         .collection('treasury_exits')
                         .doc(exitSnapshot.docs.first.id)
                         .delete();
+                  }
 
-                    // 2. إعادة المبلغ للخزنة
-                    setState(() => _treasuryBalance += amount);
+                  // 2. البحث عن الدفعات وحذفها
+                  final paymentsSnapshot = await _firestore
+                      .collection('loan_payments')
+                      .where('loanId', isEqualTo: docId)
+                      .get();
+
+                  for (var doc in paymentsSnapshot.docs) {
+                    await doc.reference.delete();
                   }
 
                   // 3. حذف من السلف
                   await _firestore.collection("loans").doc(docId).delete();
 
+                  // 4. إعادة المبلغ غير المدفوع للخزنة
+                  final remainingAmount = amount - paidAmount;
+                  if (remainingAmount > 0) {
+                    setState(() => _treasuryBalance += remainingAmount);
+                  }
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text("تم حذف السلفة بنجاح وإرجاع المبلغ للخزنة"),
+                      content: Text("تم حذف السلفة بنجاح"),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -1517,8 +2378,6 @@ class _LoansPageState extends State<LoansPage> {
   }
 
   // ================= إنشاء PDF =================
-
-  // ================== GENERATE PDF ==================
   Future<void> _generatePDF() async {
     if (_arabicFont == null) {
       ScaffoldMessenger.of(
@@ -1587,10 +2446,18 @@ class _LoansPageState extends State<LoansPage> {
         final date = (data['date'] as Timestamp).toDate();
 
         if (_applyPDFFilter(date)) {
+          final originalAmount =
+              (data['originalAmount'] ?? data['amount'] as num).toDouble();
+          final paidAmount = (data['paidAmount'] ?? 0.0) as double;
+          final remainingAmount = originalAmount - paidAmount;
+
           loans.add({
             'id': doc.id,
             'recipient': data['recipient'] ?? '',
-            'amount': data['amount'] ?? 0.0,
+            'amount': originalAmount,
+            'paidAmount': paidAmount,
+            'remainingAmount': remainingAmount,
+            'status': data['status'] ?? 'مستحقة',
             'paymentType': data['paymentType'] ?? 'نقدي',
             'note': data['note'] ?? '',
             'formattedDate': DateFormat('yyyy/MM/dd').format(date),
@@ -1692,17 +2559,22 @@ class _LoansPageState extends State<LoansPage> {
             0: pdfLib.FlexColumnWidth(2.5),
             1: pdfLib.FlexColumnWidth(1.3),
             2: pdfLib.FlexColumnWidth(1.2),
-            3: pdfLib.FlexColumnWidth(1.3),
-            4: pdfLib.FlexColumnWidth(1.7),
-            5: pdfLib.FlexColumnWidth(0.6),
+            3: pdfLib.FlexColumnWidth(1.2),
+            4: pdfLib.FlexColumnWidth(1.2),
+            5: pdfLib.FlexColumnWidth(1.3),
+            6: pdfLib.FlexColumnWidth(1.3),
+            7: pdfLib.FlexColumnWidth(0.6),
           },
           children: [
             pdfLib.TableRow(
               decoration: const pdfLib.BoxDecoration(color: PdfColors.grey300),
               children: [
                 _buildPdfHeaderCell('ملاحظات'),
-                _buildPdfHeaderCell('الدفع'),
+                _buildPdfHeaderCell('الحالة'),
+                _buildPdfHeaderCell('المتبقي'),
+                _buildPdfHeaderCell('المدفوع'),
                 _buildPdfHeaderCell('المبلغ'),
+                _buildPdfHeaderCell('الدفع'),
                 _buildPdfHeaderCell('التاريخ'),
                 _buildPdfHeaderCell('المستلم'),
                 _buildPdfHeaderCell('م'),
@@ -1717,11 +2589,24 @@ class _LoansPageState extends State<LoansPage> {
                     l['note'].isEmpty ? '-' : l['note'],
                     align: pdfLib.TextAlign.right,
                   ),
-                  _buildPdfDataCell(l['paymentType']),
+                  _buildPdfDataCell(
+                    l['status'],
+                    color: _getStatusColorForPDF(l['status']),
+                  ),
+                  _buildPdfDataCell(
+                    (l['remainingAmount'] as double).toStringAsFixed(2),
+                    color: PdfColors.red,
+                    bold: true,
+                  ),
+                  _buildPdfDataCell(
+                    (l['paidAmount'] as double).toStringAsFixed(2),
+                    color: PdfColors.green,
+                  ),
                   _buildPdfDataCell(
                     (l['amount'] as double).toStringAsFixed(2),
                     bold: true,
                   ),
+                  _buildPdfDataCell(l['paymentType']),
                   _buildPdfDataCell(l['formattedDate']),
                   _buildPdfDataCell(
                     l['recipient'],
@@ -1737,36 +2622,114 @@ class _LoansPageState extends State<LoansPage> {
     );
   }
 
+  PdfColor _getStatusColorForPDF(String status) {
+    switch (status) {
+      case 'مكتملة':
+        return PdfColors.green;
+      case 'مدفوعة جزئياً':
+        return PdfColors.blue;
+      case 'مستحقة':
+        return PdfColors.orange;
+      default:
+        return PdfColors.black;
+    }
+  }
+
   // ================== TOTAL ==================
   pdfLib.Widget _buildPdfTotalSection(List<Map<String, dynamic>> loans) {
-    final total = loans.fold(0.0, (s, l) => s + (l['amount'] as double));
+    final totalAmount = loans.fold(0.0, (s, l) => s + (l['amount'] as double));
+    final totalPaid = loans.fold(
+      0.0,
+      (s, l) => s + (l['paidAmount'] as double),
+    );
+    final totalRemaining = totalAmount - totalPaid;
 
     return pdfLib.Directionality(
       textDirection: pdfLib.TextDirection.rtl,
-      child: pdfLib.Container(
-        padding: const pdfLib.EdgeInsets.all(8),
-        decoration: pdfLib.BoxDecoration(border: pdfLib.Border.all()),
-        child: pdfLib.Row(
-          mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
-          children: [
-            pdfLib.Text(
-              'الإجمالي',
-              style: pdfLib.TextStyle(
-                fontSize: 13,
-                fontWeight: pdfLib.FontWeight.bold,
-                font: _arabicFont,
-              ),
+      child: pdfLib.Column(
+        children: [
+          pdfLib.Container(
+            padding: const pdfLib.EdgeInsets.all(8),
+            decoration: pdfLib.BoxDecoration(border: pdfLib.Border.all()),
+            child: pdfLib.Row(
+              mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+              children: [
+                pdfLib.Text(
+                  'إجمالي المبلغ',
+                  style: pdfLib.TextStyle(
+                    fontSize: 13,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                  ),
+                ),
+                pdfLib.Text(
+                  '${totalAmount.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                  ),
+                ),
+              ],
             ),
-            pdfLib.Text(
-              '${total.toStringAsFixed(2)} ج',
-              style: pdfLib.TextStyle(
-                fontSize: 14,
-                fontWeight: pdfLib.FontWeight.bold,
-                font: _arabicFont,
-              ),
+          ),
+          pdfLib.SizedBox(height: 4),
+          pdfLib.Container(
+            padding: const pdfLib.EdgeInsets.all(8),
+            decoration: pdfLib.BoxDecoration(border: pdfLib.Border.all()),
+            child: pdfLib.Row(
+              mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+              children: [
+                pdfLib.Text(
+                  'إجمالي المدفوع',
+                  style: pdfLib.TextStyle(
+                    fontSize: 13,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                    color: PdfColors.green,
+                  ),
+                ),
+                pdfLib.Text(
+                  '${totalPaid.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                    color: PdfColors.green,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          pdfLib.SizedBox(height: 4),
+          pdfLib.Container(
+            padding: const pdfLib.EdgeInsets.all(8),
+            decoration: pdfLib.BoxDecoration(border: pdfLib.Border.all()),
+            child: pdfLib.Row(
+              mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+              children: [
+                pdfLib.Text(
+                  'إجمالي المتبقي',
+                  style: pdfLib.TextStyle(
+                    fontSize: 13,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                    color: PdfColors.red,
+                  ),
+                ),
+                pdfLib.Text(
+                  '${totalRemaining.toStringAsFixed(2)} ج',
+                  style: pdfLib.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pdfLib.FontWeight.bold,
+                    font: _arabicFont,
+                    color: PdfColors.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1791,6 +2754,7 @@ class _LoansPageState extends State<LoansPage> {
     String text, {
     pdfLib.TextAlign align = pdfLib.TextAlign.center,
     bool bold = false,
+    PdfColor? color,
   }) {
     return pdfLib.Padding(
       padding: const pdfLib.EdgeInsets.all(4),
@@ -1803,6 +2767,7 @@ class _LoansPageState extends State<LoansPage> {
           fontSize: 10,
           fontWeight: bold ? pdfLib.FontWeight.bold : pdfLib.FontWeight.normal,
           font: _arabicFont,
+          color: color,
         ),
       ),
     );
@@ -1812,457 +2777,6 @@ class _LoansPageState extends State<LoansPage> {
   String _getPDFFileName() {
     return DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
   }
-
-  // Future<void> _generatePDF() async {
-  //   if (_arabicFont == null) {
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(const SnackBar(content: Text('الخط العربي غير محمل')));
-  //     return;
-  //   }
-
-  //   setState(() => _isGeneratingPDF = true);
-
-  //   try {
-  //     final loans = await _fetchLoansForPDF();
-
-  //     if (loans.isEmpty) {
-  //       ScaffoldMessenger.of(
-  //         context,
-  //       ).showSnackBar(const SnackBar(content: Text('لا توجد سلفات للطباعة')));
-  //       return;
-  //     }
-
-  //     final pdf = pdfLib.Document(
-  //       theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
-  //     );
-
-  //     pdf.addPage(
-  //       pdfLib.MultiPage(
-  //         pageFormat: PdfPageFormat.a4,
-  //         margin: pdfLib.EdgeInsets.all(25),
-  //         build: (context) => [
-  //           _buildPdfHeader(),
-  //           pdfLib.SizedBox(height: 15),
-  //           _buildPdfTitle(),
-  //           pdfLib.SizedBox(height: 25),
-  //           _buildPdfTable(loans),
-  //           pdfLib.SizedBox(height: 20),
-  //           _buildPdfTotalSection(loans),
-  //         ],
-  //       ),
-  //     );
-
-  //     await Printing.layoutPdf(
-  //       onLayout: (PdfPageFormat format) async => pdf.save(),
-  //       name: 'السلفات_${_getPDFFileName()}',
-  //     );
-  //   } catch (e) {
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(SnackBar(content: Text('حدث خطأ في إنشاء PDF: $e')));
-  //   } finally {
-  //     setState(() => _isGeneratingPDF = false);
-  //   }
-  // }
-
-  // Future<List<Map<String, dynamic>>> _fetchLoansForPDF() async {
-  //   try {
-  //     Query query = _firestore
-  //         .collection("loans")
-  //         .orderBy('date', descending: true);
-
-  //     final snapshot = await query.get();
-  //     List<Map<String, dynamic>> filteredLoans = [];
-
-  //     for (var doc in snapshot.docs) {
-  //       final data = doc.data() as Map<String, dynamic>;
-  //       final date = (data['date'] as Timestamp).toDate();
-  //       final docId = doc.id;
-
-  //       if (_applyPDFFilter(date)) {
-  //         filteredLoans.add({
-  //           'id': docId,
-  //           'recipient': data['recipient'] ?? '',
-  //           'amount': data['amount'] ?? 0.0,
-  //           'paymentType': data['paymentType'] ?? 'نقدي',
-  //           'note': data['note'] ?? '',
-  //           'date': date,
-  //           'formattedDate': DateFormat('yyyy/MM/dd').format(date),
-  //         });
-  //       }
-  //     }
-
-  //     return filteredLoans;
-  //   } catch (e) {
-  //     debugPrint('خطأ في جلب السلفات للPDF: $e');
-  //     return [];
-  //   }
-  // }
-
-  // bool _applyPDFFilter(DateTime date) {
-  //   final now = DateTime.now();
-
-  //   switch (_timeFilter) {
-  //     case 'اليوم':
-  //       return date.year == now.year &&
-  //           date.month == now.month &&
-  //           date.day == now.day;
-  //     case 'هذا الشهر':
-  //       return date.year == now.year && date.month == now.month;
-  //     case 'هذه السنة':
-  //       return date.year == now.year;
-  //     case 'مخصص':
-  //       return date.month == _selectedMonth && date.year == _selectedYear;
-  //     case 'الكل':
-  //     default:
-  //       return true;
-  //   }
-  // }
-
-  // pdfLib.Widget _buildPdfHeader() {
-  //   return pdfLib.Directionality(
-  //     textDirection: pdfLib.TextDirection.rtl,
-  //     child: pdfLib.Column(
-  //       crossAxisAlignment: pdfLib.CrossAxisAlignment.start,
-  //       children: [
-  //         pdfLib.Row(
-  //           mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
-  //           children: [
-  //             pdfLib.Text(
-  //               'FN 455.5 - 203/317/22',
-  //               style: pdfLib.TextStyle(
-  //                 fontSize: 14,
-  //                 fontWeight: pdfLib.FontWeight.bold,
-  //                 font: _arabicFont,
-  //                 color: PdfColors.black,
-  //               ),
-  //             ),
-  //             pdfLib.Text(
-  //               'سجل السلفات',
-  //               style: pdfLib.TextStyle(
-  //                 fontSize: 20,
-  //                 fontWeight: pdfLib.FontWeight.bold,
-  //                 font: _arabicFont,
-  //                 color: PdfColors.black,
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //         pdfLib.Divider(color: PdfColors.black, thickness: 2),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // pdfLib.Widget _buildPdfTitle() {
-  //   return pdfLib.Directionality(
-  //     textDirection: pdfLib.TextDirection.rtl,
-  //     child: pdfLib.Column(
-  //       crossAxisAlignment: pdfLib.CrossAxisAlignment.center,
-  //       children: [
-  //         pdfLib.Text(
-  //           'السلفات الكاملة لشهر $_selectedMonth',
-  //           style: pdfLib.TextStyle(
-  //             fontSize: 18,
-  //             fontWeight: pdfLib.FontWeight.bold,
-  //             font: _arabicFont,
-  //             color: PdfColors.black,
-  //           ),
-  //           textAlign: pdfLib.TextAlign.center,
-  //         ),
-  //         pdfLib.SizedBox(height: 10),
-  //         pdfLib.Text(
-  //           'تاريخ الطباعة: ${DateFormat('yyyy/MM/dd').format(DateTime.now())}',
-  //           style: pdfLib.TextStyle(
-  //             fontSize: 14,
-  //             font: _arabicFont,
-  //             color: PdfColors.black,
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // pdfLib.Widget _buildPdfTable(List<Map<String, dynamic>> loans) {
-  //   return pdfLib.Directionality(
-  //     textDirection: pdfLib.TextDirection.rtl,
-  //     child: pdfLib.Column(
-  //       children: [
-  //         pdfLib.Table(
-  //           border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1.5),
-  //           columnWidths: {
-  //             5: pdfLib.FlexColumnWidth(0.7),
-  //             4: pdfLib.FlexColumnWidth(1.5),
-  //             3: pdfLib.FlexColumnWidth(1.5),
-  //             2: pdfLib.FlexColumnWidth(2.0),
-  //             1: pdfLib.FlexColumnWidth(2.5),
-  //             0: pdfLib.FlexColumnWidth(3.0),
-  //           },
-  //           defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
-  //           children: [
-  //             pdfLib.TableRow(
-  //               children: [
-  //                 _buildPdfHeaderCell('الملاحظات'),
-  //                 _buildPdfHeaderCell('طريقة الدفع'),
-  //                 _buildPdfHeaderCell('المبلغ'),
-  //                 _buildPdfHeaderCell('التاريخ'),
-  //                 _buildPdfHeaderCell('اسم المستلم'),
-  //                 _buildPdfHeaderCell('م'),
-  //               ],
-  //             ),
-  //             ...loans.asMap().entries.map((entry) {
-  //               int index = entry.key + 1;
-  //               Map<String, dynamic> loan = entry.value;
-
-  //               return pdfLib.TableRow(
-  //                 children: [
-  //                   _buildPdfDataCell(
-  //                     loan['note']?.toString().isNotEmpty == true
-  //                         ? loan['note'].toString()
-  //                         : '-',
-  //                     textAlign: pdfLib.TextAlign.right,
-  //                   ),
-  //                   _buildPdfDataCell(
-  //                     loan['paymentType']?.toString() ?? 'نقدي',
-  //                     textAlign: pdfLib.TextAlign.center,
-  //                   ),
-  //                   _buildPdfDataCell(
-  //                     '${(loan['amount'] as double).toStringAsFixed(2)}',
-  //                     textAlign: pdfLib.TextAlign.center,
-  //                     isAmount: true,
-  //                   ),
-  //                   _buildPdfDataCell(
-  //                     loan['formattedDate']?.toString() ?? '',
-  //                     textAlign: pdfLib.TextAlign.center,
-  //                   ),
-  //                   _buildPdfDataCell(
-  //                     loan['recipient']?.toString() ?? '',
-  //                     textAlign: pdfLib.TextAlign.right,
-  //                   ),
-  //                   _buildPdfDataCell(
-  //                     index.toString(),
-  //                     textAlign: pdfLib.TextAlign.center,
-  //                   ),
-  //                 ],
-  //               );
-  //             }).toList(),
-  //           ],
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // pdfLib.Widget _buildPdfTotalSection(List<Map<String, dynamic>> loans) {
-  //   double total = loans.fold(
-  //     0.0,
-  //     (sum, loan) => sum + (loan['amount'] as double),
-  //   );
-
-  //   double cashTotal = loans
-  //       .where((loan) => loan['paymentType'] == 'نقدي')
-  //       .fold(0.0, (sum, loan) => sum + (loan['amount'] as double));
-
-  //   double transferTotal = loans
-  //       .where((loan) => loan['paymentType'] == 'تحويل بنكي')
-  //       .fold(0.0, (sum, loan) => sum + (loan['amount'] as double));
-
-  //   double checkTotal = loans
-  //       .where((loan) => loan['paymentType'] == 'شيك')
-  //       .fold(0.0, (sum, loan) => sum + (loan['amount'] as double));
-
-  //   return pdfLib.Directionality(
-  //     textDirection: pdfLib.TextDirection.rtl,
-  //     child: pdfLib.Column(
-  //       children: [
-  //         pdfLib.Container(
-  //           padding: pdfLib.EdgeInsets.all(12),
-  //           decoration: pdfLib.BoxDecoration(
-  //             border: pdfLib.Border.all(color: PdfColors.black, width: 2),
-  //           ),
-  //           child: pdfLib.Row(
-  //             mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
-  //             children: [
-  //               pdfLib.Text(
-  //                 'إجمالي السلفات',
-  //                 style: pdfLib.TextStyle(
-  //                   fontSize: 18,
-  //                   fontWeight: pdfLib.FontWeight.bold,
-  //                   font: _arabicFont,
-  //                   color: PdfColors.black,
-  //                 ),
-  //               ),
-  //               pdfLib.Text(
-  //                 '${total.toStringAsFixed(2)} ج',
-  //                 style: pdfLib.TextStyle(
-  //                   fontSize: 20,
-  //                   fontWeight: pdfLib.FontWeight.bold,
-  //                   font: _arabicFont,
-  //                   color: PdfColors.black,
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //         pdfLib.SizedBox(height: 10),
-  //         pdfLib.Container(
-  //           padding: pdfLib.EdgeInsets.all(12),
-  //           decoration: pdfLib.BoxDecoration(
-  //             border: pdfLib.Border.all(color: PdfColors.green, width: 1),
-  //           ),
-  //           child: pdfLib.Row(
-  //             mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
-  //             children: [
-  //               pdfLib.Text(
-  //                 'نقدي',
-  //                 style: pdfLib.TextStyle(
-  //                   fontSize: 16,
-  //                   fontWeight: pdfLib.FontWeight.bold,
-  //                   font: _arabicFont,
-  //                   color: PdfColors.green,
-  //                 ),
-  //               ),
-  //               pdfLib.Text(
-  //                 '${cashTotal.toStringAsFixed(2)} ج',
-  //                 style: pdfLib.TextStyle(
-  //                   fontSize: 16,
-  //                   fontWeight: pdfLib.FontWeight.bold,
-  //                   font: _arabicFont,
-  //                   color: PdfColors.green,
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //         pdfLib.SizedBox(height: 5),
-  //         pdfLib.Container(
-  //           padding: pdfLib.EdgeInsets.all(12),
-  //           decoration: pdfLib.BoxDecoration(
-  //             border: pdfLib.Border.all(color: PdfColors.blue, width: 1),
-  //           ),
-  //           child: pdfLib.Row(
-  //             mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
-  //             children: [
-  //               pdfLib.Text(
-  //                 'تحويل بنكي',
-  //                 style: pdfLib.TextStyle(
-  //                   fontSize: 16,
-  //                   fontWeight: pdfLib.FontWeight.bold,
-  //                   font: _arabicFont,
-  //                   color: PdfColors.blue,
-  //                 ),
-  //               ),
-  //               pdfLib.Text(
-  //                 '${transferTotal.toStringAsFixed(2)} ج',
-  //                 style: pdfLib.TextStyle(
-  //                   fontSize: 16,
-  //                   fontWeight: pdfLib.FontWeight.bold,
-  //                   font: _arabicFont,
-  //                   color: PdfColors.blue,
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //         pdfLib.SizedBox(height: 5),
-  //         pdfLib.Container(
-  //           padding: pdfLib.EdgeInsets.all(12),
-  //           decoration: pdfLib.BoxDecoration(
-  //             border: pdfLib.Border.all(color: PdfColors.orange, width: 1),
-  //           ),
-  //           child: pdfLib.Row(
-  //             mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
-  //             children: [
-  //               pdfLib.Text(
-  //                 'شيك',
-  //                 style: pdfLib.TextStyle(
-  //                   fontSize: 16,
-  //                   fontWeight: pdfLib.FontWeight.bold,
-  //                   font: _arabicFont,
-  //                   color: PdfColors.orange,
-  //                 ),
-  //               ),
-  //               pdfLib.Text(
-  //                 '${checkTotal.toStringAsFixed(2)} ج',
-  //                 style: pdfLib.TextStyle(
-  //                   fontSize: 16,
-  //                   fontWeight: pdfLib.FontWeight.bold,
-  //                   font: _arabicFont,
-  //                   color: PdfColors.orange,
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
-  // pdfLib.Widget _buildPdfHeaderCell(String text) {
-  //   return pdfLib.Container(
-  //     padding: pdfLib.EdgeInsets.all(10),
-  //     child: pdfLib.Text(
-  //       text,
-  //       style: pdfLib.TextStyle(
-  //         fontSize: 14,
-  //         fontWeight: pdfLib.FontWeight.bold,
-  //         font: _arabicFont,
-  //         color: PdfColors.black,
-  //       ),
-  //       textAlign: pdfLib.TextAlign.center,
-  //     ),
-  //   );
-  // }
-
-  // pdfLib.Widget _buildPdfDataCell(
-  //   String text, {
-  //   pdfLib.TextAlign textAlign = pdfLib.TextAlign.center,
-  //   bool isAmount = false,
-  // }) {
-  //   return pdfLib.Container(
-  //     padding: pdfLib.EdgeInsets.all(8),
-  //     child: pdfLib.Text(
-  //       text,
-  //       style: pdfLib.TextStyle(
-  //         fontSize: 13,
-  //         fontWeight: isAmount
-  //             ? pdfLib.FontWeight.bold
-  //             : pdfLib.FontWeight.normal,
-  //         font: _arabicFont,
-  //         color: PdfColors.black,
-  //       ),
-  //       textAlign: textAlign,
-  //       maxLines: 2,
-  //     ),
-  //   );
-  // }
-
-  // String _getPDFFileName() {
-  //   final now = DateTime.now();
-  //   String filterSuffix = '';
-
-  //   switch (_timeFilter) {
-  //     case 'اليوم':
-  //       filterSuffix = 'اليوم_${DateFormat('yyyyMMdd').format(now)}';
-  //       break;
-  //     case 'هذا الشهر':
-  //       filterSuffix = 'شهر_${now.month}_${now.year}';
-  //       break;
-  //     case 'هذه السنة':
-  //       filterSuffix = 'سنة_${now.year}';
-  //       break;
-  //     case 'مخصص':
-  //       filterSuffix = 'شهر_${_selectedMonth}_سنة_${_selectedYear}';
-  //       break;
-  //     default:
-  //       filterSuffix = 'الكامل';
-  //   }
-
-  //   return 'السلفات_$filterSuffix';
-  // }
 
   // ================= فتح نافذة إضافة/تعديل =================
   Future<void> _openLoanSheet({
@@ -2274,7 +2788,8 @@ class _LoansPageState extends State<LoansPage> {
     if (data != null) {
       // وضع التعديل
       _recipientController.text = data['recipient'];
-      _amountController.text = data['amount'].toString();
+      _amountController.text = (data['originalAmount'] ?? data['amount'])
+          .toString();
       _noteController.text = data['note'] ?? '';
       selectedPaymentType = data['paymentType'] ?? 'نقدي';
       selectedDate = (data['date'] as Timestamp).toDate();
@@ -2620,28 +3135,28 @@ class _LoansPageState extends State<LoansPage> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ['الكل', 'اليوم', 'هذا الشهر', 'هذه السنة']
-                  .map(
-                    (filter) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ChoiceChip(
-                        label: Text(filter),
-                        selected: _timeFilter == filter,
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() => _timeFilter = filter);
-                          }
-                        },
-                        selectedColor: const Color(0xFF27AE60),
-                        labelStyle: TextStyle(
-                          color: _timeFilter == filter
-                              ? Colors.white
-                              : const Color(0xFF2C3E50),
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
+              // children: ['الكل', 'اليوم', 'هذا الشهر', 'هذه السنة']
+              //     .map(
+              //       (filter) => Padding(
+              //         padding: const EdgeInsets.symmetric(horizontal: 4),
+              //         child: ChoiceChip(
+              //           label: Text(filter),
+              //           selected: _timeFilter == filter,
+              //           onSelected: (selected) {
+              //             if (selected) {
+              //               setState(() => _timeFilter = filter);
+              //             }
+              //           },
+              //           selectedColor: const Color(0xFF27AE60),
+              //           labelStyle: TextStyle(
+              //             color: _timeFilter == filter
+              //                 ? Colors.white
+              //                 : const Color(0xFF2C3E50),
+              //           ),
+              //         ),
+              //       ),
+              //     )
+              //     .toList(),
             ),
           ),
           const SizedBox(height: 12),
@@ -2692,27 +3207,34 @@ class _LoansPageState extends State<LoansPage> {
   }
 
   Widget _buildStats(List<QueryDocumentSnapshot> docs) {
-    double total = 0;
-    double cashTotal = 0;
-    double transferTotal = 0;
-    double checkTotal = 0;
+    double totalAmount = 0;
+    double totalPaid = 0;
+    double totalRemaining = 0;
+    int completedLoans = 0;
+    int partialLoans = 0;
+    int pendingLoans = 0;
 
     for (var doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
-      final amount = data['amount'] as double;
-      final paymentType = data['paymentType'] as String;
+      final originalAmount = (data['originalAmount'] ?? data['amount'] as num)
+          .toDouble();
+      final paidAmount = (data['paidAmount'] ?? 0.0) as double;
+      final remainingAmount = originalAmount - paidAmount;
+      final status = data['status'] ?? 'مستحقة';
 
-      total += amount;
+      totalAmount += originalAmount;
+      totalPaid += paidAmount;
+      totalRemaining += remainingAmount;
 
-      switch (paymentType) {
-        case 'نقدي':
-          cashTotal += amount;
+      switch (status) {
+        case 'مكتملة':
+          completedLoans++;
           break;
-        case 'تحويل بنكي':
-          transferTotal += amount;
+        case 'مدفوعة جزئياً':
+          partialLoans++;
           break;
-        case 'شيك':
-          checkTotal += amount;
+        case 'مستحقة':
+          pendingLoans++;
           break;
       }
     }
@@ -2746,7 +3268,7 @@ class _LoansPageState extends State<LoansPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "${total.toStringAsFixed(2)} ج",
+                          "${totalAmount.toStringAsFixed(2)} ج",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -2767,10 +3289,10 @@ class _LoansPageState extends State<LoansPage> {
                     ),
                     child: Column(
                       children: [
-                        const Text("نقدي", style: TextStyle(fontSize: 12)),
+                        const Text("المدفوع", style: TextStyle(fontSize: 12)),
                         const SizedBox(height: 4),
                         Text(
-                          "${cashTotal.toStringAsFixed(2)} ج",
+                          "${totalPaid.toStringAsFixed(2)} ج",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -2790,19 +3312,19 @@ class _LoansPageState extends State<LoansPage> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                      color: Colors.red.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
                       children: [
-                        const Text("تحويل", style: TextStyle(fontSize: 12)),
+                        const Text("المتبقي", style: TextStyle(fontSize: 12)),
                         const SizedBox(height: 4),
                         Text(
-                          "${transferTotal.toStringAsFixed(2)} ج",
+                          "${totalRemaining.toStringAsFixed(2)} ج",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: Colors.blue,
+                            color: Colors.red,
                           ),
                         ),
                       ],
@@ -2819,10 +3341,10 @@ class _LoansPageState extends State<LoansPage> {
                     ),
                     child: Column(
                       children: [
-                        const Text("شيك", style: TextStyle(fontSize: 12)),
+                        const Text("السلفات", style: TextStyle(fontSize: 12)),
                         const SizedBox(height: 4),
                         Text(
-                          "${checkTotal.toStringAsFixed(2)} ج",
+                          "${docs.length}",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -2835,9 +3357,49 @@ class _LoansPageState extends State<LoansPage> {
                 ),
               ],
             ),
+            // const SizedBox(height: 8),
+            // Container(
+            //   padding: const EdgeInsets.all(12),
+            //   decoration: BoxDecoration(
+            //     color: Colors.grey[50],
+            //     borderRadius: BorderRadius.circular(8),
+            //   ),
+            //   child: Row(
+            //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            //     children: [
+            //       _buildStatusChip('مكتملة', completedLoans, Colors.green),
+            //       _buildStatusChip('جزئية', partialLoans, Colors.blue),
+            //       _buildStatusChip('مستحقة', pendingLoans, Colors.orange),
+            //     ],
+            //   ),
+            // ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStatusChip(String text, int count, Color color) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: color,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(text, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+      ],
     );
   }
 
@@ -2846,9 +3408,15 @@ class _LoansPageState extends State<LoansPage> {
     final docId = doc.id;
     final date = (data['date'] as Timestamp).toDate();
     final paymentType = data['paymentType'] as String;
+    final originalAmount = (data['originalAmount'] ?? data['amount'] as num)
+        .toDouble();
+    final paidAmount = (data['paidAmount'] ?? 0.0) as double;
+    final remainingAmount = originalAmount - paidAmount;
+    final status = data['status'] ?? 'مستحقة';
 
     Color paymentColor;
     IconData paymentIcon;
+    Color statusColor;
 
     switch (paymentType) {
       case 'نقدي':
@@ -2868,6 +3436,20 @@ class _LoansPageState extends State<LoansPage> {
         paymentIcon = Icons.more_horiz;
     }
 
+    switch (status) {
+      case 'مكتملة':
+        statusColor = Colors.green;
+        break;
+      case 'مدفوعة جزئياً':
+        statusColor = Colors.blue;
+        break;
+      case 'مستحقة':
+        statusColor = Colors.orange;
+        break;
+      default:
+        statusColor = Colors.grey;
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListTile(
@@ -2875,9 +3457,29 @@ class _LoansPageState extends State<LoansPage> {
           backgroundColor: paymentColor.withOpacity(0.1),
           child: Icon(paymentIcon, color: paymentColor, size: 20),
         ),
-        title: Text(
-          data['recipient'],
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        title: Row(
+          children: [
+            Text(
+              data['recipient'],
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                status,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: statusColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2893,16 +3495,68 @@ class _LoansPageState extends State<LoansPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              "${data['amount'].toStringAsFixed(2)} ج",
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-              ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "المبلغ الأصلي",
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                      Text(
+                        "${originalAmount.toStringAsFixed(2)} ج",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "المدفوع",
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                      Text(
+                        "${paidAmount.toStringAsFixed(2)} ج",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "المتبقي",
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                      Text(
+                        "${remainingAmount.toStringAsFixed(2)} ج",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               DateFormat('yyyy/MM/dd').format(date),
               style: const TextStyle(fontSize: 12),
@@ -2917,53 +3571,315 @@ class _LoansPageState extends State<LoansPage> {
               ),
           ],
         ),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          onSelected: (value) async {
-            if (value == 'edit') {
-              await _openLoanSheet(docId: docId, data: data);
-            } else if (value == 'delete') {
-              await _confirmDelete(
-                docId,
-                data['recipient'],
-                (data['amount'] as double),
-              );
-            }
-          },
-          itemBuilder: (BuildContext context) {
-            return [
-              const PopupMenuItem<String>(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 20),
-                    SizedBox(width: 8),
-                    Text('تعديل'),
-                  ],
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // زر السداد ElevatedButton
+            if (remainingAmount > 0)
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await _makePayment(docId, data);
+                },
+                icon: Icon(Icons.payment, size: 16),
+                label: Text('سداد'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  minimumSize: Size(80, 36),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 2,
+                  shadowColor: Colors.green.withOpacity(0.3),
                 ),
               ),
-              const PopupMenuItem<String>(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, color: Colors.red, size: 20),
-                    SizedBox(width: 8),
-                    Text('حذف', style: TextStyle(color: Colors.red)),
-                  ],
+
+            const SizedBox(width: 8),
+
+            // زر القائمة (ثلاث نقاط)
+            PopupMenuButton<String>(
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: const Icon(Icons.more_vert, color: Colors.grey),
               ),
-            ];
-          },
+              onSelected: (value) async {
+                if (value == 'edit') {
+                  await _openLoanSheet(docId: docId, data: data);
+                } else if (value == 'delete') {
+                  await _confirmDelete(
+                    docId,
+                    data['recipient'],
+                    originalAmount,
+                    paidAmount,
+                  );
+                }
+              },
+              itemBuilder: (BuildContext context) {
+                return [
+                  PopupMenuItem<String>(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20),
+                        SizedBox(width: 8),
+                        Text('تعديل'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red, size: 20),
+                        SizedBox(width: 8),
+                        Text('حذف', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ];
+              },
+            ),
+          ],
         ),
       ),
     );
   }
+  // Widget _buildLoanCard(QueryDocumentSnapshot doc) {
+  //   final data = doc.data() as Map<String, dynamic>;
+  //   final docId = doc.id;
+  //   final date = (data['date'] as Timestamp).toDate();
+  //   final paymentType = data['paymentType'] as String;
+  //   final originalAmount = (data['originalAmount'] ?? data['amount'] as num)
+  //       .toDouble();
+  //   final paidAmount = (data['paidAmount'] ?? 0.0) as double;
+  //   final remainingAmount = originalAmount - paidAmount;
+  //   final status = data['status'] ?? 'مستحقة';
+
+  //   Color paymentColor;
+  //   IconData paymentIcon;
+  //   Color statusColor;
+
+  //   switch (paymentType) {
+  //     case 'نقدي':
+  //       paymentColor = Colors.green;
+  //       paymentIcon = Icons.money;
+  //       break;
+  //     case 'تحويل بنكي':
+  //       paymentColor = Colors.blue;
+  //       paymentIcon = Icons.account_balance;
+  //       break;
+  //     case 'شيك':
+  //       paymentColor = Colors.orange;
+  //       paymentIcon = Icons.description;
+  //       break;
+  //     default:
+  //       paymentColor = Colors.grey;
+  //       paymentIcon = Icons.more_horiz;
+  //   }
+
+  //   switch (status) {
+  //     case 'مكتملة':
+  //       statusColor = Colors.green;
+  //       break;
+  //     case 'مدفوعة جزئياً':
+  //       statusColor = Colors.blue;
+  //       break;
+  //     case 'مستحقة':
+  //       statusColor = Colors.orange;
+  //       break;
+  //     default:
+  //       statusColor = Colors.grey;
+  //   }
+
+  //   return Card(
+  //     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  //     child: ListTile(
+  //       leading: CircleAvatar(
+  //         backgroundColor: paymentColor.withOpacity(0.1),
+  //         child: Icon(paymentIcon, color: paymentColor, size: 20),
+  //       ),
+  //       title: Row(
+  //         children: [
+  //           Text(
+  //             data['recipient'],
+  //             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+  //           ),
+  //           const SizedBox(width: 8),
+  //           Container(
+  //             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+  //             decoration: BoxDecoration(
+  //               color: statusColor.withOpacity(0.1),
+  //               borderRadius: BorderRadius.circular(12),
+  //             ),
+  //             child: Text(
+  //               status,
+  //               style: TextStyle(
+  //                 fontSize: 10,
+  //                 color: statusColor,
+  //                 fontWeight: FontWeight.bold,
+  //               ),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //       subtitle: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           const SizedBox(height: 4),
+  //           Row(
+  //             children: [
+  //               Icon(paymentIcon, size: 16, color: paymentColor),
+  //               const SizedBox(width: 4),
+  //               Text(
+  //                 paymentType,
+  //                 style: TextStyle(fontSize: 14, color: paymentColor),
+  //               ),
+  //             ],
+  //           ),
+  //           const SizedBox(height: 4),
+  //           Row(
+  //             children: [
+  //               Expanded(
+  //                 child: Column(
+  //                   crossAxisAlignment: CrossAxisAlignment.start,
+  //                   children: [
+  //                     Text(
+  //                       "المبلغ الأصلي",
+  //                       style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+  //                     ),
+  //                     Text(
+  //                       "${originalAmount.toStringAsFixed(2)} ج",
+  //                       style: const TextStyle(
+  //                         fontSize: 14,
+  //                         fontWeight: FontWeight.bold,
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //               Expanded(
+  //                 child: Column(
+  //                   crossAxisAlignment: CrossAxisAlignment.start,
+  //                   children: [
+  //                     Text(
+  //                       "المدفوع",
+  //                       style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+  //                     ),
+  //                     Text(
+  //                       "${paidAmount.toStringAsFixed(2)} ج",
+  //                       style: TextStyle(
+  //                         fontSize: 14,
+  //                         fontWeight: FontWeight.bold,
+  //                         color: Colors.green,
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //               Expanded(
+  //                 child: Column(
+  //                   crossAxisAlignment: CrossAxisAlignment.start,
+  //                   children: [
+  //                     Text(
+  //                       "المتبقي",
+  //                       style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+  //                     ),
+  //                     Text(
+  //                       "${remainingAmount.toStringAsFixed(2)} ج",
+  //                       style: TextStyle(
+  //                         fontSize: 14,
+  //                         fontWeight: FontWeight.bold,
+  //                         color: Colors.red,
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //           const SizedBox(height: 4),
+  //           Text(
+  //             DateFormat('yyyy/MM/dd').format(date),
+  //             style: const TextStyle(fontSize: 12),
+  //           ),
+  //           if (data['note'] != null && data['note'].isNotEmpty)
+  //             Padding(
+  //               padding: const EdgeInsets.only(top: 4),
+  //               child: Text(
+  //                 data['note'],
+  //                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+  //               ),
+  //             ),
+  //         ],
+  //       ),
+  //       trailing: PopupMenuButton<String>(
+  //         icon: const Icon(Icons.more_vert),
+  //         onSelected: (value) async {
+  //           if (value == 'edit') {
+  //             await _openLoanSheet(docId: docId, data: data);
+  //           } else if (value == 'pay') {
+  //             await _makePayment(docId, data);
+  //           } else if (value == 'delete') {
+  //             await _confirmDelete(
+  //               docId,
+  //               data['recipient'],
+  //               originalAmount,
+  //               paidAmount,
+  //             );
+  //           }
+  //         },
+  //         itemBuilder: (BuildContext context) {
+  //           return [
+  //             if (remainingAmount > 0)
+  //               PopupMenuItem<String>(
+  //                 value: 'pay',
+  //                 child: Row(
+  //                   children: [
+  //                     Icon(Icons.payment, color: Colors.green, size: 20),
+  //                     SizedBox(width: 8),
+  //                     Text('سداد'),
+  //                   ],
+  //                 ),
+  //               ),
+  //             PopupMenuItem<String>(
+  //               value: 'edit',
+  //               child: Row(
+  //                 children: [
+  //                   Icon(Icons.edit, size: 20),
+  //                   SizedBox(width: 8),
+  //                   Text('تعديل'),
+  //                 ],
+  //               ),
+  //             ),
+  //             PopupMenuItem<String>(
+  //               value: 'delete',
+  //               child: Row(
+  //                 children: [
+  //                   Icon(Icons.delete, color: Colors.red, size: 20),
+  //                   SizedBox(width: 8),
+  //                   Text('حذف', style: TextStyle(color: Colors.red)),
+  //                 ],
+  //               ),
+  //             ),
+  //           ];
+  //         },
+  //       ),
+  //     ),
+  //   );
+  // }
 
   void _resetForm() {
     _recipientController.clear();
     _amountController.clear();
     _noteController.clear();
+    _paymentAmountController.clear();
     selectedPaymentType = "نقدي";
+    selectedPaymentTypeForSettlement = "نقدي";
     selectedDate = DateTime.now();
     _editingDocId = "";
   }
@@ -2973,6 +3889,7 @@ class _LoansPageState extends State<LoansPage> {
     _recipientController.dispose();
     _amountController.dispose();
     _noteController.dispose();
+    _paymentAmountController.dispose();
     super.dispose();
   }
 
@@ -3000,131 +3917,131 @@ class _LoansPageState extends State<LoansPage> {
                   allDocs,
                 );
 
-                if (snapshot.data!.docs.isEmpty) {
-                  return Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade100),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.account_balance_wallet,
-                              color: Colors.blue[800],
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "رصيد الخزنة الحالي",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "${_treasuryBalance.toStringAsFixed(2)} ج",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: _treasuryBalance > 1000
-                                          ? Colors.green[800]
-                                          : Colors.red[800],
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.credit_card,
-                                size: 80,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                "لا توجد سلفات",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "انقر على زر + لإضافة أول سلفة",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                }
+                // if (snapshot.data!.docs.isEmpty) {
+                //   return Column(
+                //     children: [
+                //       Container(
+                //         padding: const EdgeInsets.all(12),
+                //         margin: const EdgeInsets.all(8),
+                //         decoration: BoxDecoration(
+                //           color: Colors.blue.shade50,
+                //           borderRadius: BorderRadius.circular(8),
+                //           border: Border.all(color: Colors.blue.shade100),
+                //         ),
+                //         child: Row(
+                //           children: [
+                //             Icon(
+                //               Icons.account_balance_wallet,
+                //               color: Colors.blue[800],
+                //             ),
+                //             const SizedBox(width: 10),
+                //             Expanded(
+                //               child: Column(
+                //                 crossAxisAlignment: CrossAxisAlignment.start,
+                //                 children: [
+                //                   const Text(
+                //                     "رصيد الخزنة الحالي",
+                //                     style: TextStyle(
+                //                       fontSize: 12,
+                //                       color: Colors.blue,
+                //                     ),
+                //                   ),
+                //                   const SizedBox(height: 4),
+                //                   Text(
+                //                     "${_treasuryBalance.toStringAsFixed(2)} ج",
+                //                     style: TextStyle(
+                //                       fontWeight: FontWeight.bold,
+                //                       color: _treasuryBalance > 1000
+                //                           ? Colors.green[800]
+                //                           : Colors.red[800],
+                //                       fontSize: 16,
+                //                     ),
+                //                   ),
+                //                 ],
+                //               ),
+                //             ),
+                //           ],
+                //         ),
+                //       ),
+                //       Expanded(
+                //         child: Center(
+                //           child: Column(
+                //             mainAxisAlignment: MainAxisAlignment.center,
+                //             children: [
+                //               const Icon(
+                //                 Icons.credit_card,
+                //                 size: 80,
+                //                 color: Colors.grey,
+                //               ),
+                //               const SizedBox(height: 16),
+                //               const Text(
+                //                 "لا توجد سلفات",
+                //                 style: TextStyle(
+                //                   fontSize: 18,
+                //                   color: Colors.grey,
+                //                 ),
+                //               ),
+                //               const SizedBox(height: 8),
+                //               Text(
+                //                 "انقر على زر + لإضافة أول سلفة",
+                //                 style: TextStyle(
+                //                   fontSize: 14,
+                //                   color: Colors.grey.shade600,
+                //                 ),
+                //               ),
+                //             ],
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   );
+                // }
 
                 return Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.shade100),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.account_balance_wallet,
-                            color: Colors.blue[800],
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  "رصيد الخزنة الحالي",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.blue,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "${_treasuryBalance.toStringAsFixed(2)} ج",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: _treasuryBalance > 1000
-                                        ? Colors.green[800]
-                                        : Colors.red[800],
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    // Container(
+                    //   padding: const EdgeInsets.all(12),
+                    //   margin: const EdgeInsets.all(8),
+                    //   decoration: BoxDecoration(
+                    //     color: Colors.blue.shade50,
+                    //     borderRadius: BorderRadius.circular(8),
+                    //     border: Border.all(color: Colors.blue.shade100),
+                    //   ),
+                    //   child: Row(
+                    //     children: [
+                    //       Icon(
+                    //         Icons.account_balance_wallet,
+                    //         color: Colors.blue[800],
+                    //       ),
+                    //       const SizedBox(width: 10),
+                    //       Expanded(
+                    //         child: Column(
+                    //           crossAxisAlignment: CrossAxisAlignment.start,
+                    //           children: [
+                    //             const Text(
+                    //               "رصيد الخزنة الحالي",
+                    //               style: TextStyle(
+                    //                 fontSize: 12,
+                    //                 color: Colors.blue,
+                    //               ),
+                    //             ),
+                    //             const SizedBox(height: 4),
+                    //             Text(
+                    //               "${_treasuryBalance.toStringAsFixed(2)} ج",
+                    //               style: TextStyle(
+                    //                 fontWeight: FontWeight.bold,
+                    //                 color: _treasuryBalance > 1000
+                    //                     ? Colors.green[800]
+                    //                     : Colors.red[800],
+                    //                 fontSize: 16,
+                    //               ),
+                    //             ),
+                    //           ],
+                    //         ),
+                    //       ),
+                    //     ],
+                    //   ),
+                    // ),
                     _buildStats(filteredDocs),
                     Expanded(
                       child: ListView.builder(
