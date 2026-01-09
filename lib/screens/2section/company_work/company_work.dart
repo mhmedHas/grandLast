@@ -14576,9 +14576,9 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
   // دوال مساعدة
   // ================================
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   SnackBar(content: Text(message), backgroundColor: Colors.red),
+    // );
   }
 
   void _showSuccess(String message) {
