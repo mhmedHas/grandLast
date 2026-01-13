@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:last/Splash.dart';
 import 'package:last/firebase_options.dart';
 import 'package:last/screens/1section/DailyWork_page.dart';
 import 'package:last/screens/2section/company_work/company_home.dart';
@@ -33,7 +34,7 @@ class ShippingCompanyApp extends StatelessWidget {
         fontFamily: 'Cairo',
         useMaterial3: true,
       ),
-      home: MainDashboard(),
+      home: Splash(),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -146,14 +147,21 @@ class _MainDashboardState extends State<MainDashboard> {
                     },
                   ),
                   SizedBox(width: 10),
-                  Icon(Icons.local_shipping, color: Colors.white, size: 32),
+                  ClipOval(
+                    child: Image.asset(
+                      'assets/image/app_icon.png',
+                      width: 38,
+                      height: 38,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                   SizedBox(width: 10),
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'نيون جراند',
+                        'نيو جراند',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -215,17 +223,20 @@ class _MainDashboardState extends State<MainDashboard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.local_shipping,
-                    color: Colors.white,
-                    size: isTablet ? 30 : 36,
+                  ClipOval(
+                    child: Image.asset(
+                      'assets/image/app_icon.png',
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                   SizedBox(width: isTablet ? 8 : 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'نيون جراند',
+                        'نيو جراند',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: isTablet ? 16 : 18,
@@ -405,16 +416,24 @@ class _MainDashboardState extends State<MainDashboard> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.local_shipping, color: Colors.white, size: 48),
+                  ClipOval(
+                    child: Image.asset(
+                      'assets/image/app_icon.png',
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                   SizedBox(height: 10),
                   Text(
-                    'نيون جراند',
+                    'نيو جراند',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+
                   Text(
                     'نظام إدارة الشحنات',
                     style: TextStyle(color: Colors.grey[300], fontSize: 12),
