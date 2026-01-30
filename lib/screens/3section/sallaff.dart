@@ -2405,7 +2405,7 @@ class _LoansPageState extends State<LoansPage> {
       pdf.addPage(
         pdfLib.MultiPage(
           pageFormat: PdfPageFormat.a4,
-          margin: const pdfLib.EdgeInsets.all(15),
+          margin: const pdfLib.EdgeInsets.all(25),
           build: (context) => [
             _buildPdfHeader(),
             pdfLib.SizedBox(height: 8),
@@ -2561,9 +2561,10 @@ class _LoansPageState extends State<LoansPage> {
             2: pdfLib.FlexColumnWidth(1.2),
             3: pdfLib.FlexColumnWidth(1.2),
             4: pdfLib.FlexColumnWidth(1.2),
-            5: pdfLib.FlexColumnWidth(1.3),
+            5: pdfLib.FlexColumnWidth(1.2),
             6: pdfLib.FlexColumnWidth(1.3),
-            7: pdfLib.FlexColumnWidth(0.6),
+            7: pdfLib.FlexColumnWidth(1.2),
+            8: pdfLib.FlexColumnWidth(.6),
           },
           children: [
             pdfLib.TableRow(

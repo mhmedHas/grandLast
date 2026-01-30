@@ -3962,11 +3962,11 @@ class _DriverWorkPageState extends State<DriverWorkPage> {
       );
       _arabicFont = pdfLib.Font.ttf(fontData);
     } catch (e) {
-      debugPrint('فشل تحميل الخط العربي: $e');
+      // debugPrint('فشل تحميل الخط العربي: $e');
       // استخدام خط افتراضي إذا لم يتم تحميل الخط العربي
-      _arabicFont = pdfLib.Font.ttf(
-        await rootBundle.load('assets/fonts/Amiri/Amiri-Regular.ttf'),
-      );
+      // _arabicFont = pdfLib.Font.ttf(
+      //   await rootBundle.load('assets/fonts/Amiri/Amiri-Regular.ttf'),
+      // );
     }
   }
 
