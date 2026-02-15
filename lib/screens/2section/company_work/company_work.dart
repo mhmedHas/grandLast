@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:last/screens/2section/company_work/edit_company.dart';
 import 'package:pdf/pdf.dart' as pdfLib;
 import 'package:pdf/widgets.dart' as pdfLib;
 import 'package:printing/printing.dart';
@@ -923,9 +924,38 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
   // تحميل بيانات الشركة المختارة (متحسن)
   // ================================
 
-  Future<void> _loadCompanyData(String companyName, String companyId) async {
-    // دائماً تحميل من الشبكة أولاً
-    await _clearCompanyCache(companyId);
+  // ================================
+  // تحميل بيانات الشركة المختارة (متحسن)
+  // ================================
+  Future<void> _loadCompanyData(
+    String companyName,
+    String companyId, {
+    bool forceRefresh = false,
+  }) async {
+    // إذا كان forceRefresh = true، قم بمسح الكاش أولاً
+    if (forceRefresh) {
+      await _clearCompanyCache(companyId);
+    }
+
+    // التحقق من cache (فقط إذا لم يكن forceRefresh)
+    if (!forceRefresh &&
+        _companyWorkCache.containsKey(companyId) &&
+        _companyInvoicesCache.containsKey(companyId) &&
+        _availableTripsCache.containsKey(companyId)) {
+      if (mounted) {
+        setState(() {
+          _selectedCompany = companyName;
+          _selectedCompanyId = companyId;
+          _companyWork = List.from(_companyWorkCache[companyId]!);
+          _availableTripsForInvoice = List.from(
+            _availableTripsCache[companyId]!,
+          );
+          _companyInvoices = List.from(_companyInvoicesCache[companyId]!);
+          _isLoading = false;
+        });
+      }
+      return;
+    }
 
     if (mounted) {
       setState(() {
@@ -946,18 +976,14 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
     }
 
     try {
-      // تحميل قائمة ID الرحلات المفوتورة من الشبكة فقط
-      final invoicedTripIds = await _loadInvoicedTripIdsFromNetwork(companyId);
+      // تحميل قائمة ID الرحلات المفوتورة أولاً (سريع)
+      final invoicedTripIds = await _loadInvoicedTripIds(companyId);
 
-      // ثم تحميل الرحلات من الشبكة فقط
-      await _loadCompanyTripsFromNetwork(
-        companyId,
-        companyName,
-        invoicedTripIds,
-      );
+      // ثم تحميل الرحلات مع تحديث الحالة مباشرة
+      await _loadCompanyTrips(companyId, companyName, invoicedTripIds);
 
-      // أخيراً تحميل تفاصيل الفواتير من الشبكة فقط
-      await _loadCompanyInvoicesFromNetwork(companyId);
+      // أخيراً تحميل تفاصيل الفواتير الكاملة
+      await _loadCompanyInvoices(companyId);
 
       if (mounted) {
         setState(() {
@@ -965,11 +991,10 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
         });
       }
 
-      // حفظ في cache بعد التحميل من الشبكة
+      // حفظ في cache
       _companyWorkCache[companyId] = List.from(_companyWork);
       _companyInvoicesCache[companyId] = List.from(_companyInvoices);
       _availableTripsCache[companyId] = List.from(_availableTripsForInvoice);
-      _invoicedTripIdsCache[companyId] = List.from(invoicedTripIds);
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -977,6 +1002,61 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
       _showError('خطأ في تحميل بيانات الشركة: $e');
     }
   }
+
+  // Future<void> _loadCompanyData(String companyName, String companyId) async {
+  //   // دائماً تحميل من الشبكة أولاً
+  //   await _clearCompanyCache(companyId);
+
+  //   if (mounted) {
+  //     setState(() {
+  //       _selectedCompany = companyName;
+  //       _selectedCompanyId = companyId;
+  //       _isLoading = true;
+  //       _companyWork.clear();
+  //       _availableTripsForInvoice.clear();
+  //       _companyInvoices.clear();
+  //       _selectedTripsForInvoice.clear();
+  //       _invoiceNameController.clear();
+  //       _invoiceNotesController.clear();
+  //       _tripsCurrentPage = 0;
+  //       _invoicesCurrentPage = 0;
+  //       _hasMoreTrips = true;
+  //       _hasMoreInvoices = true;
+  //     });
+  //   }
+
+  //   try {
+  //     // تحميل قائمة ID الرحلات المفوتورة من الشبكة فقط
+  //     final invoicedTripIds = await _loadInvoicedTripIdsFromNetwork(companyId);
+
+  //     // ثم تحميل الرحلات من الشبكة فقط
+  //     await _loadCompanyTripsFromNetwork(
+  //       companyId,
+  //       companyName,
+  //       invoicedTripIds,
+  //     );
+
+  //     // أخيراً تحميل تفاصيل الفواتير من الشبكة فقط
+  //     await _loadCompanyInvoicesFromNetwork(companyId);
+
+  //     if (mounted) {
+  //       setState(() {
+  //         _isLoading = false;
+  //       });
+  //     }
+
+  //     // حفظ في cache بعد التحميل من الشبكة
+  //     _companyWorkCache[companyId] = List.from(_companyWork);
+  //     _companyInvoicesCache[companyId] = List.from(_companyInvoices);
+  //     _availableTripsCache[companyId] = List.from(_availableTripsForInvoice);
+  //     _invoicedTripIdsCache[companyId] = List.from(invoicedTripIds);
+  //   } catch (e) {
+  //     if (mounted) {
+  //       setState(() => _isLoading = false);
+  //     }
+  //     _showError('خطأ في تحميل بيانات الشركة: $e');
+  //   }
+  // }
 
   Future<List<String>> _loadInvoicedTripIdsFromNetwork(String companyId) async {
     try {
@@ -1844,19 +1924,42 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
   // ================================
   // تحديث قائمة الفواتير بعد التغييرات
   // ================================
+  // Future<void> _refreshInvoices() async {
+  //   if (_selectedCompanyId == null) return;
+
+  //   try {
+  //     // تحديث الفواتير مباشرة دون إعادة تحميل كامل الصفحة
+  //     await _loadCompanyInvoices(_selectedCompanyId!);
+
+  //     _showSuccess('تم تحديث الفواتير');
+  //   } catch (e) {
+  //     debugPrint('خطأ في تحديث الفواتير: $e');
+  //   }
+  // }
+
+  // ================================
+  // تحديث قائمة الفواتير بعد التغييرات
+  // ================================
   Future<void> _refreshInvoices() async {
     if (_selectedCompanyId == null) return;
 
     try {
-      // تحديث الفواتير مباشرة دون إعادة تحميل كامل الصفحة
-      await _loadCompanyInvoices(_selectedCompanyId!);
+      // مسح الكاش الخاص بالشركة أولاً
+      await _clearCompanyCache(_selectedCompanyId!);
+
+      // إعادة تحميل بيانات الشركة بالكامل من الشبكة
+      await _loadCompanyData(_selectedCompany!, _selectedCompanyId!);
+
+      // تحديث الواجهة
+      if (mounted) {
+        setState(() {});
+      }
 
       _showSuccess('تم تحديث الفواتير');
     } catch (e) {
       debugPrint('خطأ في تحديث الفواتير: $e');
     }
   }
-
   //   Future<void> _createInvoice() async {
   //     if (_selectedTripsForInvoice.isEmpty) {
   //       _showError('يرجى اختيار رحلات لإنشاء الفاتورة');
@@ -4394,780 +4497,6 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
     return size.width < 600;
   }
 
-  // Widget _buildInvoicesSection() {
-  //   if (_isLoading && _companyInvoices.isEmpty) {
-  //     return const Center(child: CircularProgressIndicator());
-  //   }
-
-  //   final notCollectedInvoices = _getFilteredInvoices(false);
-  //   final collectedInvoices = _getFilteredInvoices(true);
-
-  //   return Column(
-  //     children: [
-  //       Container(
-  //         padding: EdgeInsets.all(_isMobile ? 12 : 16),
-  //         color: Colors.blue[50],
-  //         child: Column(
-  //           children: [
-  //             if (_isMobile)
-  //               Column(
-  //                 children: [
-  //                   // فلترة الشهر
-  //                   Container(
-  //                     padding: const EdgeInsets.symmetric(horizontal: 8),
-  //                     decoration: BoxDecoration(
-  //                       color: Colors.white,
-  //                       borderRadius: BorderRadius.circular(8),
-  //                       border: Border.all(color: Colors.grey[300]!),
-  //                     ),
-  //                     child: DropdownButtonHideUnderline(
-  //                       child: DropdownButton<String>(
-  //                         value: _selectedMonthFilter,
-  //                         isExpanded: true,
-  //                         icon: const Icon(
-  //                           Icons.arrow_drop_down,
-  //                           color: Color(0xFF3498DB),
-  //                           size: 20,
-  //                         ),
-  //                         style: const TextStyle(
-  //                           color: Color(0xFF2C3E50),
-  //                           fontSize: 12,
-  //                         ),
-  //                         items: [
-  //                           DropdownMenuItem<String>(
-  //                             value: 'كل الشهور',
-  //                             child: Text('كل الشهور'),
-  //                           ),
-  //                           ..._monthsList.map((String month) {
-  //                             return DropdownMenuItem<String>(
-  //                               value: month,
-  //                               child: Text(month),
-  //                             );
-  //                           }).toList(),
-  //                         ],
-  //                         onChanged: (String? newValue) {
-  //                           if (newValue != null) {
-  //                             setState(() {
-  //                               _selectedMonthFilter = newValue;
-  //                             });
-  //                           }
-  //                         },
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 8),
-
-  //                   // فلترة السنة
-  //                   Row(
-  //                     children: [
-  //                       Expanded(
-  //                         child: Container(
-  //                           decoration: BoxDecoration(
-  //                             color: Colors.white,
-  //                             borderRadius: BorderRadius.circular(8),
-  //                             border: Border.all(color: Colors.grey[300]!),
-  //                           ),
-  //                           child: DropdownButtonHideUnderline(
-  //                             child: DropdownButton<String>(
-  //                               value: _selectedYearFilter,
-  //                               isExpanded: true,
-  //                               style: const TextStyle(
-  //                                 color: Color(0xFF2C3E50),
-  //                                 fontSize: 12,
-  //                               ),
-  //                               items: _yearsList.map((String year) {
-  //                                 return DropdownMenuItem<String>(
-  //                                   value: year,
-  //                                   child: Text(year),
-  //                                 );
-  //                               }).toList(),
-  //                               onChanged: (String? newValue) {
-  //                                 if (newValue != null) {
-  //                                   setState(() {
-  //                                     _selectedYearFilter = newValue;
-  //                                   });
-  //                                 }
-  //                               },
-  //                             ),
-  //                           ),
-  //                         ),
-  //                       ),
-  //                     ],
-  //                   ),
-  //                   const SizedBox(height: 12),
-  //                 ],
-  //               )
-  //             else
-  //               Row(
-  //                 children: [
-  //                   const Icon(Icons.filter_alt, color: Color(0xFF3498DB)),
-  //                   const SizedBox(width: 8),
-  //                   const Text(
-  //                     'فلترة حسب:',
-  //                     style: TextStyle(
-  //                       fontWeight: FontWeight.bold,
-  //                       color: Color(0xFF3498DB),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(width: 16),
-
-  //                   Container(
-  //                     width: 100,
-  //                     child: Expanded(
-  //                       child: Container(
-  //                         padding: const EdgeInsets.symmetric(horizontal: 8),
-  //                         decoration: BoxDecoration(
-  //                           color: Colors.white,
-  //                           borderRadius: BorderRadius.circular(8),
-  //                           border: Border.all(color: Colors.grey[300]!),
-  //                         ),
-  //                         child: DropdownButtonHideUnderline(
-  //                           child: DropdownButton<String>(
-  //                             value: _selectedMonthFilter,
-  //                             isExpanded: true,
-  //                             icon: const Icon(
-  //                               Icons.arrow_drop_down,
-  //                               color: Color(0xFF3498DB),
-  //                               size: 20,
-  //                             ),
-  //                             style: const TextStyle(
-  //                               color: Color(0xFF2C3E50),
-  //                               fontSize: 12,
-  //                             ),
-  //                             items: [
-  //                               DropdownMenuItem<String>(
-  //                                 value: 'كل الشهور',
-  //                                 child: Text('كل الشهور'),
-  //                               ),
-  //                               ..._monthsList.map((String month) {
-  //                                 return DropdownMenuItem<String>(
-  //                                   value: month,
-  //                                   child: Text(month),
-  //                                 );
-  //                               }).toList(),
-  //                             ],
-  //                             onChanged: (String? newValue) {
-  //                               if (newValue != null) {
-  //                                 setState(() {
-  //                                   _selectedMonthFilter = newValue;
-  //                                 });
-  //                               }
-  //                             },
-  //                           ),
-  //                         ),
-  //                       ),
-  //                     ),
-  //                   ),
-
-  //                   const SizedBox(width: 8),
-
-  //                   Container(
-  //                     width: 100,
-  //                     decoration: BoxDecoration(
-  //                       color: Colors.white,
-  //                       borderRadius: BorderRadius.circular(8),
-  //                       border: Border.all(color: Colors.grey[300]!),
-  //                     ),
-  //                     child: DropdownButtonHideUnderline(
-  //                       child: DropdownButton<String>(
-  //                         value: _selectedYearFilter,
-  //                         isExpanded: true,
-  //                         style: const TextStyle(
-  //                           color: Color(0xFF2C3E50),
-  //                           fontSize: 12,
-  //                         ),
-  //                         items: _yearsList.map((String year) {
-  //                           return DropdownMenuItem<String>(
-  //                             value: year,
-  //                             child: Text(year),
-  //                           );
-  //                         }).toList(),
-  //                         onChanged: (String? newValue) {
-  //                           if (newValue != null) {
-  //                             setState(() {
-  //                               _selectedYearFilter = newValue;
-  //                             });
-  //                           }
-  //                         },
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-
-  //             const SizedBox(height: 12),
-  //             Row(
-  //               children: [
-  //                 Expanded(
-  //                   child: ElevatedButton.icon(
-  //                     onPressed: _isGeneratingPDF
-  //                         ? null
-  //                         : () => _printMonthInvoices(false),
-  //                     icon: _isGeneratingPDF
-  //                         ? SizedBox(
-  //                             width: 20,
-  //                             height: 20,
-  //                             child: CircularProgressIndicator(
-  //                               color: Colors.white,
-  //                             ),
-  //                           )
-  //                         : Icon(Icons.print, size: _isMobile ? 16 : 18),
-  //                     label: Text(
-  //                       _isGeneratingPDF
-  //                           ? 'جاري الطباعة...'
-  //                           : _isMobile
-  //                           ? 'غير محصلة'
-  //                           : 'طباعة فواتير الشهر غير المحصلة',
-  //                       style: TextStyle(fontSize: _isMobile ? 12 : 12),
-  //                     ),
-  //                     style: ElevatedButton.styleFrom(
-  //                       backgroundColor: Colors.orange,
-  //                       foregroundColor: Colors.white,
-  //                       padding: EdgeInsets.symmetric(
-  //                         vertical: _isMobile ? 8 : 10,
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ),
-  //                 SizedBox(width: _isMobile ? 6 : 8),
-  //                 Expanded(
-  //                   child: ElevatedButton.icon(
-  //                     onPressed: _isGeneratingPDF
-  //                         ? null
-  //                         : () => _printMonthInvoices(true),
-  //                     icon: _isGeneratingPDF
-  //                         ? SizedBox(
-  //                             width: 20,
-  //                             height: 20,
-  //                             child: CircularProgressIndicator(
-  //                               color: Colors.white,
-  //                             ),
-  //                           )
-  //                         : Icon(Icons.print, size: _isMobile ? 16 : 18),
-  //                     label: Text(
-  //                       _isGeneratingPDF
-  //                           ? 'جاري الطباعة...'
-  //                           : _isMobile
-  //                           ? 'محصلة'
-  //                           : 'طباعة فواتير الشهر المحصلة',
-  //                       style: TextStyle(fontSize: _isMobile ? 12 : 12),
-  //                     ),
-  //                     style: ElevatedButton.styleFrom(
-  //                       backgroundColor: const Color.fromARGB(255, 255, 0, 0),
-  //                       foregroundColor: Colors.white,
-  //                       padding: EdgeInsets.symmetric(
-  //                         vertical: _isMobile ? 8 : 10,
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ),
-  //               ],
-  //             ),
-  //             const SizedBox(height: 12),
-
-  //             Container(
-  //               decoration: BoxDecoration(
-  //                 color: Colors.white,
-  //                 borderRadius: BorderRadius.circular(_isMobile ? 6 : 8),
-  //                 border: Border.all(color: Colors.grey[300]!),
-  //               ),
-  //               child: Row(
-  //                 children: [
-  //                   Expanded(
-  //                     child: InkWell(
-  //                       onTap: () {
-  //                         setState(() {
-  //                           _currentInvoiceView = 0;
-  //                         });
-  //                       },
-  //                       child: Container(
-  //                         padding: EdgeInsets.symmetric(
-  //                           vertical: _isMobile ? 10 : 12,
-  //                         ),
-  //                         decoration: BoxDecoration(
-  //                           color: _currentInvoiceView == 0
-  //                               ? const Color.fromARGB(255, 254, 21, 0)
-  //                               : Colors.white,
-  //                           borderRadius: const BorderRadius.horizontal(
-  //                             right: Radius.circular(8),
-  //                           ),
-  //                         ),
-  //                         child: Column(
-  //                           children: [
-  //                             Icon(
-  //                               Icons.money_off,
-  //                               color: _currentInvoiceView == 0
-  //                                   ? Colors.white
-  //                                   : Colors.grey,
-  //                               size: _isMobile ? 18 : 20,
-  //                             ),
-  //                             Text(
-  //                               _isMobile
-  //                                   ? 'غير محصلة (${notCollectedInvoices.length})'
-  //                                   : 'غير المحصلة (${notCollectedInvoices.length})',
-  //                               style: TextStyle(
-  //                                 color: _currentInvoiceView == 0
-  //                                     ? Colors.white
-  //                                     : Colors.grey,
-  //                                 fontWeight: FontWeight.bold,
-  //                                 fontSize: _isMobile ? 10 : 11,
-  //                               ),
-  //                               textAlign: TextAlign.center,
-  //                             ),
-  //                           ],
-  //                         ),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   Container(width: 1, height: 40, color: Colors.grey[300]),
-  //                   Expanded(
-  //                     child: InkWell(
-  //                       onTap: () {
-  //                         setState(() {
-  //                           _currentInvoiceView = 1;
-  //                         });
-  //                       },
-  //                       child: Container(
-  //                         padding: EdgeInsets.symmetric(
-  //                           vertical: _isMobile ? 10 : 12,
-  //                         ),
-  //                         decoration: BoxDecoration(
-  //                           color: _currentInvoiceView == 1
-  //                               ? const Color.fromARGB(255, 255, 0, 0)
-  //                               : Colors.white,
-  //                           borderRadius: const BorderRadius.horizontal(
-  //                             left: Radius.circular(8),
-  //                           ),
-  //                         ),
-  //                         child: Column(
-  //                           children: [
-  //                             Icon(
-  //                               Icons.check_circle,
-  //                               color: _currentInvoiceView == 1
-  //                                   ? Colors.white
-  //                                   : Colors.grey,
-  //                               size: _isMobile ? 18 : 20,
-  //                             ),
-  //                             Text(
-  //                               _isMobile
-  //                                   ? 'محصلة (${collectedInvoices.length})'
-  //                                   : 'المحصلة (${collectedInvoices.length})',
-  //                               style: TextStyle(
-  //                                 color: _currentInvoiceView == 1
-  //                                     ? Colors.white
-  //                                     : Colors.grey,
-  //                                 fontWeight: FontWeight.bold,
-  //                                 fontSize: _isMobile ? 10 : 11,
-  //                               ),
-  //                               textAlign: TextAlign.center,
-  //                             ),
-  //                           ],
-  //                         ),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-
-  //       Expanded(
-  //         child: _currentInvoiceView == 0
-  //             ? _buildInvoicesList(notCollectedInvoices, false)
-  //             : _buildInvoicesList(collectedInvoices, true),
-  //       ),
-  //     ],
-  //   );
-  // }
-
-  // Widget _buildInvoicesSection() {
-  //   if (_isLoading && _companyInvoices.isEmpty) {
-  //     return const Center(child: CircularProgressIndicator());
-  //   }
-
-  //   final notCollectedInvoices = _getFilteredInvoices(false);
-  //   final collectedInvoices = _getFilteredInvoices(true);
-
-  //   return Column(
-  //     children: [
-  //       Container(
-  //         padding: EdgeInsets.all(_isMobile ? 12 : 16),
-  //         color: Colors.blue[50],
-  //         child: Column(
-  //           children: [
-  //             // القسم الموبايل - تم إصلاحه
-  //             if (_isMobile)
-  //               Column(
-  //                 children: [
-  //                   // فلترة الشهر - بدون Expanded
-  //                   Container(
-  //                     padding: const EdgeInsets.symmetric(horizontal: 8),
-  //                     decoration: BoxDecoration(
-  //                       color: Colors.white,
-  //                       borderRadius: BorderRadius.circular(8),
-  //                       border: Border.all(color: Colors.grey[300]!),
-  //                     ),
-  //                     child: DropdownButtonHideUnderline(
-  //                       child: DropdownButton<String>(
-  //                         value: _selectedMonthFilter,
-  //                         isExpanded: true,
-  //                         icon: const Icon(
-  //                           Icons.arrow_drop_down,
-  //                           color: Color(0xFF3498DB),
-  //                           size: 20,
-  //                         ),
-  //                         style: const TextStyle(
-  //                           color: Color(0xFF2C3E50),
-  //                           fontSize: 12,
-  //                         ),
-  //                         items: [
-  //                           const DropdownMenuItem<String>(
-  //                             value: 'كل الشهور',
-  //                             child: Text('كل الشهور'),
-  //                           ),
-  //                           ..._monthsList.map((String month) {
-  //                             return DropdownMenuItem<String>(
-  //                               value: month,
-  //                               child: Text(month),
-  //                             );
-  //                           }).toList(),
-  //                         ],
-  //                         onChanged: (String? newValue) {
-  //                           if (newValue != null) {
-  //                             setState(() {
-  //                               _selectedMonthFilter = newValue;
-  //                             });
-  //                           }
-  //                         },
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 8),
-
-  //                   // فلترة السنة - بدون Row و Expanded
-  //                   Container(
-  //                     padding: const EdgeInsets.symmetric(horizontal: 8),
-  //                     decoration: BoxDecoration(
-  //                       color: Colors.white,
-  //                       borderRadius: BorderRadius.circular(8),
-  //                       border: Border.all(color: Colors.grey[300]!),
-  //                     ),
-  //                     child: DropdownButtonHideUnderline(
-  //                       child: DropdownButton<String>(
-  //                         value: _selectedYearFilter,
-  //                         isExpanded: true,
-  //                         style: const TextStyle(
-  //                           color: Color(0xFF2C3E50),
-  //                           fontSize: 12,
-  //                         ),
-  //                         items: _yearsList.map((String year) {
-  //                           return DropdownMenuItem<String>(
-  //                             value: year,
-  //                             child: Text(year),
-  //                           );
-  //                         }).toList(),
-  //                         onChanged: (String? newValue) {
-  //                           if (newValue != null) {
-  //                             setState(() {
-  //                               _selectedYearFilter = newValue;
-  //                             });
-  //                           }
-  //                         },
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 12),
-  //                 ],
-  //               )
-  //             else
-  //               // القسم المكتبي
-  //               Row(
-  //                 children: [
-  //                   const Icon(Icons.filter_alt, color: Color(0xFF3498DB)),
-  //                   const SizedBox(width: 8),
-  //                   const Text(
-  //                     'فلترة حسب:',
-  //                     style: TextStyle(
-  //                       fontWeight: FontWeight.bold,
-  //                       color: Color(0xFF3498DB),
-  //                     ),
-  //                   ),
-  //                   const SizedBox(width: 16),
-
-  //                   // فلترة الشهر (Desktop)
-  //                   Container(
-  //                     width: 120,
-  //                     padding: const EdgeInsets.symmetric(horizontal: 8),
-  //                     decoration: BoxDecoration(
-  //                       color: Colors.white,
-  //                       borderRadius: BorderRadius.circular(8),
-  //                       border: Border.all(color: Colors.grey[300]!),
-  //                     ),
-  //                     child: DropdownButtonHideUnderline(
-  //                       child: DropdownButton<String>(
-  //                         value: _selectedMonthFilter,
-  //                         isExpanded: true,
-  //                         icon: const Icon(
-  //                           Icons.arrow_drop_down,
-  //                           color: Color(0xFF3498DB),
-  //                           size: 20,
-  //                         ),
-  //                         style: const TextStyle(
-  //                           color: Color(0xFF2C3E50),
-  //                           fontSize: 12,
-  //                         ),
-  //                         items: [
-  //                           const DropdownMenuItem<String>(
-  //                             value: 'كل الشهور',
-  //                             child: Text('كل الشهور'),
-  //                           ),
-  //                           ..._monthsList.map((String month) {
-  //                             return DropdownMenuItem<String>(
-  //                               value: month,
-  //                               child: Text(month),
-  //                             );
-  //                           }).toList(),
-  //                         ],
-  //                         onChanged: (String? newValue) {
-  //                           if (newValue != null) {
-  //                             setState(() {
-  //                               _selectedMonthFilter = newValue;
-  //                             });
-  //                           }
-  //                         },
-  //                       ),
-  //                     ),
-  //                   ),
-
-  //                   const SizedBox(width: 8),
-
-  //                   // فلترة السنة (Desktop)
-  //                   Container(
-  //                     width: 100,
-  //                     decoration: BoxDecoration(
-  //                       color: Colors.white,
-  //                       borderRadius: BorderRadius.circular(8),
-  //                       border: Border.all(color: Colors.grey[300]!),
-  //                     ),
-  //                     child: DropdownButtonHideUnderline(
-  //                       child: DropdownButton<String>(
-  //                         value: _selectedYearFilter,
-  //                         isExpanded: true,
-  //                         style: const TextStyle(
-  //                           color: Color(0xFF2C3E50),
-  //                           fontSize: 12,
-  //                         ),
-  //                         items: _yearsList.map((String year) {
-  //                           return DropdownMenuItem<String>(
-  //                             value: year,
-  //                             child: Text(year),
-  //                           );
-  //                         }).toList(),
-  //                         onChanged: (String? newValue) {
-  //                           if (newValue != null) {
-  //                             setState(() {
-  //                               _selectedYearFilter = newValue;
-  //                             });
-  //                           }
-  //                         },
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-
-  //             const SizedBox(height: 12),
-
-  //             // أزرار الطباعة - كما هي
-  //             Row(
-  //               children: [
-  //                 Expanded(
-  //                   child: ElevatedButton.icon(
-  //                     onPressed: _isGeneratingPDF
-  //                         ? null
-  //                         : () => _printMonthInvoices(false),
-  //                     icon: _isGeneratingPDF
-  //                         ? SizedBox(
-  //                             width: 20,
-  //                             height: 20,
-  //                             child: CircularProgressIndicator(
-  //                               color: Colors.white,
-  //                             ),
-  //                           )
-  //                         : Icon(Icons.print, size: _isMobile ? 16 : 18),
-  //                     label: Text(
-  //                       _isGeneratingPDF
-  //                           ? 'جاري الطباعة...'
-  //                           : _isMobile
-  //                           ? 'غير محصلة'
-  //                           : 'طباعة فواتير الشهر غير المحصلة',
-  //                       style: TextStyle(fontSize: _isMobile ? 12 : 12),
-  //                     ),
-  //                     style: ElevatedButton.styleFrom(
-  //                       backgroundColor: Colors.orange,
-  //                       foregroundColor: Colors.white,
-  //                       padding: EdgeInsets.symmetric(
-  //                         vertical: _isMobile ? 8 : 10,
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ),
-  //                 SizedBox(width: _isMobile ? 6 : 8),
-  //                 Expanded(
-  //                   child: ElevatedButton.icon(
-  //                     onPressed: _isGeneratingPDF
-  //                         ? null
-  //                         : () => _printMonthInvoices(true),
-  //                     icon: _isGeneratingPDF
-  //                         ? SizedBox(
-  //                             width: 20,
-  //                             height: 20,
-  //                             child: CircularProgressIndicator(
-  //                               color: Colors.white,
-  //                             ),
-  //                           )
-  //                         : Icon(Icons.print, size: _isMobile ? 16 : 18),
-  //                     label: Text(
-  //                       _isGeneratingPDF
-  //                           ? 'جاري الطباعة...'
-  //                           : _isMobile
-  //                           ? 'محصلة'
-  //                           : 'طباعة فواتير الشهر المحصلة',
-  //                       style: TextStyle(fontSize: _isMobile ? 12 : 12),
-  //                     ),
-  //                     style: ElevatedButton.styleFrom(
-  //                       backgroundColor: const Color.fromARGB(255, 255, 0, 0),
-  //                       foregroundColor: Colors.white,
-  //                       padding: EdgeInsets.symmetric(
-  //                         vertical: _isMobile ? 8 : 10,
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ),
-  //               ],
-  //             ),
-  //             const SizedBox(height: 12),
-
-  //             // أزرار التبديل بين المحصلة وغير المحصلة - كما هي
-  //             Container(
-  //               decoration: BoxDecoration(
-  //                 color: Colors.white,
-  //                 borderRadius: BorderRadius.circular(_isMobile ? 6 : 8),
-  //                 border: Border.all(color: Colors.grey[300]!),
-  //               ),
-  //               child: Row(
-  //                 children: [
-  //                   Expanded(
-  //                     child: InkWell(
-  //                       onTap: () {
-  //                         setState(() {
-  //                           _currentInvoiceView = 0;
-  //                         });
-  //                       },
-  //                       child: Container(
-  //                         padding: EdgeInsets.symmetric(
-  //                           vertical: _isMobile ? 10 : 12,
-  //                         ),
-  //                         decoration: BoxDecoration(
-  //                           color: _currentInvoiceView == 0
-  //                               ? const Color.fromARGB(255, 254, 21, 0)
-  //                               : Colors.white,
-  //                           borderRadius: const BorderRadius.horizontal(
-  //                             right: Radius.circular(8),
-  //                           ),
-  //                         ),
-  //                         child: Column(
-  //                           children: [
-  //                             Icon(
-  //                               Icons.money_off,
-  //                               color: _currentInvoiceView == 0
-  //                                   ? Colors.white
-  //                                   : Colors.grey,
-  //                               size: _isMobile ? 18 : 20,
-  //                             ),
-  //                             Text(
-  //                               _isMobile
-  //                                   ? 'غير محصلة (${notCollectedInvoices.length})'
-  //                                   : 'غير المحصلة (${notCollectedInvoices.length})',
-  //                               style: TextStyle(
-  //                                 color: _currentInvoiceView == 0
-  //                                     ? Colors.white
-  //                                     : Colors.grey,
-  //                                 fontWeight: FontWeight.bold,
-  //                                 fontSize: _isMobile ? 10 : 11,
-  //                               ),
-  //                               textAlign: TextAlign.center,
-  //                             ),
-  //                           ],
-  //                         ),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                   Container(width: 1, height: 40, color: Colors.grey[300]),
-  //                   Expanded(
-  //                     child: InkWell(
-  //                       onTap: () {
-  //                         setState(() {
-  //                           _currentInvoiceView = 1;
-  //                         });
-  //                       },
-  //                       child: Container(
-  //                         padding: EdgeInsets.symmetric(
-  //                           vertical: _isMobile ? 10 : 12,
-  //                         ),
-  //                         decoration: BoxDecoration(
-  //                           color: _currentInvoiceView == 1
-  //                               ? const Color.fromARGB(255, 255, 0, 0)
-  //                               : Colors.white,
-  //                           borderRadius: const BorderRadius.horizontal(
-  //                             left: Radius.circular(8),
-  //                           ),
-  //                         ),
-  //                         child: Column(
-  //                           children: [
-  //                             Icon(
-  //                               Icons.check_circle,
-  //                               color: _currentInvoiceView == 1
-  //                                   ? Colors.white
-  //                                   : Colors.grey,
-  //                               size: _isMobile ? 18 : 20,
-  //                             ),
-  //                             Text(
-  //                               _isMobile
-  //                                   ? 'محصلة (${collectedInvoices.length})'
-  //                                   : 'المحصلة (${collectedInvoices.length})',
-  //                               style: TextStyle(
-  //                                 color: _currentInvoiceView == 1
-  //                                     ? Colors.white
-  //                                     : Colors.grey,
-  //                                 fontWeight: FontWeight.bold,
-  //                                 fontSize: _isMobile ? 10 : 11,
-  //                               ),
-  //                               textAlign: TextAlign.center,
-  //                             ),
-  //                           ],
-  //                         ),
-  //                       ),
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-
-  //       Expanded(
-  //         child: _currentInvoiceView == 0
-  //             ? _buildInvoicesList(notCollectedInvoices, false)
-  //             : _buildInvoicesList(collectedInvoices, true),
-  //       ),
-  //     ],
-  //   );
-  // }
-
   Widget _buildInvoicesSection() {
     if (_isLoading && _companyInvoices.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -5760,6 +5089,18 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
                   ),
                   const SizedBox(width: 10),
 
+                  // زر التعديل الجديد
+                  IconButton(
+                    icon: Icon(
+                      Icons.edit,
+                      color: const Color(0xFF2196F3),
+                      size: _isMobile ? 20 : 24,
+                    ),
+                    onPressed: () => _navigateToEditInvoice(invoice),
+                    tooltip: 'تعديل الفاتورة',
+                  ),
+                  const SizedBox(width: 5),
+
                   IconButton(
                     icon: Icon(
                       isCollected ? Icons.undo : Icons.check_circle,
@@ -5770,6 +5111,7 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
                         _toggleInvoiceCollection(invoice['id'], !isCollected),
                     tooltip: isCollected ? 'إلغاء التحصيل' : 'تم التحصيل',
                   ),
+                  const SizedBox(width: 5),
 
                   IconButton(
                     icon: Icon(
@@ -5854,6 +5196,20 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
                 if (_isMobile)
                   Column(
                     children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _navigateToEditInvoice(invoice),
+                          icon: const Icon(Icons.edit, size: 20),
+                          label: const Text('تعديل الفاتورة'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2196F3),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -5942,6 +5298,19 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
+                          onPressed: () => _navigateToEditInvoice(invoice),
+                          icon: const Icon(Icons.edit),
+                          label: const Text('تعديل الفاتورة'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2196F3),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
                           onPressed: () => _toggleInvoiceCollection(
                             invoice['id'],
                             !isCollected,
@@ -6026,6 +5395,470 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
       ),
     );
   }
+
+  // إضافة هذه الدالة الجديدة في نهاية دوال _CompanyWorkPageState
+  // قبل دوال الطباعة
+
+  // ================================
+  // التنقل إلى صفحة تعديل الفاتورة
+  // ================================
+  // ================================
+  // التنقل إلى صفحة تعديل الفاتورة
+  // ================================
+  void _navigateToEditInvoice(Map<String, dynamic> invoice) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditInvoicePage(
+          invoice: invoice,
+          companyId: _selectedCompanyId!,
+          companyName: _selectedCompany!,
+          onInvoiceUpdated: () async {
+            // تحديث الفواتير بعد العودة من صفحة التعديل مع force refresh
+            if (_selectedCompanyId != null) {
+              setState(() => _isLoading = true);
+
+              // مسح الكاش الخاص بالشركة
+              await _clearCompanyCache(_selectedCompanyId!);
+
+              // إعادة تحميل البيانات من الشبكة
+              final invoicedTripIds = await _loadInvoicedTripIdsFromNetwork(
+                _selectedCompanyId!,
+              );
+              await _loadCompanyTripsFromNetwork(
+                _selectedCompanyId!,
+                _selectedCompany!,
+                invoicedTripIds,
+              );
+              await _loadCompanyInvoicesFromNetwork(_selectedCompanyId!);
+
+              if (mounted) {
+                setState(() => _isLoading = false);
+              }
+
+              _showSuccess('تم تحديث البيانات بنجاح');
+            }
+          },
+        ),
+      ),
+    );
+  }
+  // Widget _buildInvoiceCard(
+  //   Map<String, dynamic> invoice,
+  //   int index,
+  //   bool isCollected,
+  // ) {
+  //   final createdAt = invoice['createdAt'] as DateTime?;
+  //   final collectedAt = invoice['collectedAt'] as DateTime?;
+  //   final invoiceTrips = invoice['invoiceTrips'] as List<Map<String, dynamic>>;
+  //   final month = invoice['month'] ?? 'غير محدد';
+  //   final notes = invoice['notes'] ?? '';
+  //   final kartaValue = invoice['kartaValue'] ?? 0;
+  //   final totalWithKarta =
+  //       invoice['totalWithKarta'] ?? invoice['totalAmount'] ?? 0;
+
+  //   return Container(
+  //     margin: EdgeInsets.symmetric(
+  //       vertical: _isMobile ? 4 : 6,
+  //       horizontal: _isMobile ? 4 : 8,
+  //     ),
+  //     decoration: BoxDecoration(
+  //       color: isCollected ? Colors.green[50] : Colors.white,
+  //       borderRadius: BorderRadius.circular(_isMobile ? 8 : 12),
+  //       border: Border.all(
+  //         color: isCollected ? Colors.green : Colors.grey[300]!,
+  //         width: isCollected ? 2 : 1,
+  //       ),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.05),
+  //           blurRadius: 6,
+  //           offset: const Offset(0, 2),
+  //         ),
+  //       ],
+  //     ),
+  //     child: ExpansionTile(
+  //       leading: CircleAvatar(
+  //         backgroundColor: isCollected ? Colors.green : const Color(0xFF3498DB),
+  //         radius: _isMobile ? 16 : 20,
+  //         child: Text(
+  //           '${index + 1}',
+  //           style: TextStyle(
+  //             color: Colors.white,
+  //             fontWeight: FontWeight.bold,
+  //             fontSize: _isMobile ? 12 : 14,
+  //           ),
+  //         ),
+  //       ),
+  //       title: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Row(
+  //             children: [
+  //               Expanded(
+  //                 child: Text(
+  //                   invoice['name'],
+  //                   style: TextStyle(
+  //                     fontWeight: FontWeight.bold,
+  //                     fontSize: _isMobile ? 14 : 16,
+  //                     color: isCollected
+  //                         ? Colors.green[800]
+  //                         : const Color(0xFF2C3E50),
+  //                   ),
+  //                   maxLines: 1,
+  //                   overflow: TextOverflow.ellipsis,
+  //                 ),
+  //               ),
+  //               if (isCollected)
+  //                 Container(
+  //                   padding: const EdgeInsets.symmetric(
+  //                     horizontal: 6,
+  //                     vertical: 2,
+  //                   ),
+  //                   decoration: BoxDecoration(
+  //                     color: Colors.green,
+  //                     borderRadius: BorderRadius.circular(4),
+  //                   ),
+  //                   child: Text(
+  //                     'محصلة',
+  //                     style: TextStyle(
+  //                       color: Colors.white,
+  //                       fontSize: _isMobile ? 8 : 10,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                   ),
+  //                 ),
+  //             ],
+  //           ),
+  //           const SizedBox(height: 2),
+  //           Text(
+  //             '${createdAt != null ? _formatDate(createdAt) : 'غير معروف'}  ---  رحلة >>> ${invoice['tripCount']}',
+  //             style: TextStyle(
+  //               fontSize: _isMobile ? 10 : 12,
+  //               color: isCollected ? Colors.green[600] : Colors.grey,
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //       trailing: _isMobile
+  //           ? Column(
+  //               mainAxisAlignment: MainAxisAlignment.center,
+  //               children: [
+  //                 Text(
+  //                   _formatCurrency(invoice['totalAmount'] ?? 0),
+  //                   style: TextStyle(
+  //                     fontWeight: FontWeight.bold,
+  //                     fontSize: _isMobile ? 14 : 16,
+  //                     color: isCollected
+  //                         ? Colors.green[800]
+  //                         : const Color(0xFF2E7D32),
+  //                   ),
+  //                 ),
+  //                 Text(
+  //                   'إجمالي',
+  //                   style: TextStyle(
+  //                     fontSize: _isMobile ? 10 : 12,
+  //                     color: isCollected ? Colors.green[600] : Colors.grey[600],
+  //                   ),
+  //                 ),
+  //               ],
+  //             )
+  //           : Row(
+  //               mainAxisSize: MainAxisSize.min,
+  //               children: [
+  //                 Column(
+  //                   mainAxisAlignment: MainAxisAlignment.center,
+  //                   children: [
+  //                     Text(
+  //                       _formatCurrency(invoice['totalAmount'] ?? 0),
+  //                       style: TextStyle(
+  //                         fontWeight: FontWeight.bold,
+  //                         fontSize: 16,
+  //                         color: isCollected
+  //                             ? Colors.green[800]
+  //                             : const Color(0xFF2E7D32),
+  //                       ),
+  //                     ),
+  //                     const SizedBox(height: 4),
+  //                     Text(
+  //                       'إجمالي',
+  //                       style: TextStyle(
+  //                         fontSize: 12,
+  //                         color: isCollected
+  //                             ? Colors.green[600]
+  //                             : Colors.grey[600],
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //                 const SizedBox(width: 10),
+
+  //                 IconButton(
+  //                   icon: Icon(
+  //                     isCollected ? Icons.undo : Icons.check_circle,
+  //                     color: isCollected ? Colors.orange : Colors.green,
+  //                     size: _isMobile ? 20 : 24,
+  //                   ),
+  //                   onPressed: () =>
+  //                       _toggleInvoiceCollection(invoice['id'], !isCollected),
+  //                   tooltip: isCollected ? 'إلغاء التحصيل' : 'تم التحصيل',
+  //                 ),
+
+  //                 IconButton(
+  //                   icon: Icon(
+  //                     Icons.credit_card,
+  //                     color: Color(0xFF9C27B0),
+  //                     size: _isMobile ? 20 : 24,
+  //                   ),
+  //                   onPressed: _isGeneratingPDF
+  //                       ? null
+  //                       : () => _printKartaRequest(invoice),
+  //                   tooltip: 'مطالبة كارتات',
+  //                 ),
+  //                 const SizedBox(width: 5),
+  //                 IconButton(
+  //                   icon: Icon(
+  //                     Icons.print,
+  //                     color: Color(0xFF3498DB),
+  //                     size: _isMobile ? 20 : 24,
+  //                   ),
+  //                   onPressed: _isGeneratingPDF
+  //                       ? null
+  //                       : () => _printInvoice(invoice),
+  //                   tooltip: 'طباعة الفاتورة',
+  //                 ),
+  //               ],
+  //             ),
+  //       children: [
+  //         Padding(
+  //           padding: EdgeInsets.all(_isMobile ? 8 : 16),
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Container(
+  //                 padding: EdgeInsets.all(_isMobile ? 8 : 12),
+  //                 decoration: BoxDecoration(
+  //                   color: isCollected ? Colors.green[50] : Colors.blue[50],
+  //                   borderRadius: BorderRadius.circular(_isMobile ? 6 : 8),
+  //                 ),
+  //                 child: Column(
+  //                   children: [
+  //                     _buildInvoiceSummaryRow(
+  //                       'عدد الرحلات:',
+  //                       '${invoice['tripCount']}',
+  //                     ),
+  //                     SizedBox(height: _isMobile ? 2 : 4),
+  //                     _buildInvoiceSummaryRow(
+  //                       'إجمالي النولون:',
+  //                       _formatCurrency(invoice['nolonTotal'] ?? 0),
+  //                       color: Colors.green,
+  //                     ),
+  //                     SizedBox(height: _isMobile ? 2 : 4),
+  //                     _buildInvoiceSummaryRow(
+  //                       'إجمالي المبيت:',
+  //                       _formatCurrency(invoice['overnightTotal'] ?? 0),
+  //                       color: Colors.orange,
+  //                     ),
+  //                     SizedBox(height: _isMobile ? 2 : 4),
+  //                     _buildInvoiceSummaryRow(
+  //                       'إجمالي العطلة:',
+  //                       _formatCurrency(invoice['holidayTotal'] ?? 0),
+  //                       color: Colors.red,
+  //                     ),
+  //                     SizedBox(height: _isMobile ? 2 : 4),
+  //                     _buildInvoiceSummaryRow(
+  //                       'قيمة الكارتة:',
+  //                       _formatCurrency(kartaValue),
+  //                       color: Color(0xFF9C27B0),
+  //                     ),
+  //                     SizedBox(height: _isMobile ? 2 : 4),
+  //                     _buildInvoiceSummaryRow(
+  //                       'الإجمالي النهائي:',
+  //                       _formatCurrency(totalWithKarta),
+  //                       color: Color(0xFF2E7D32),
+  //                       isBold: true,
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+
+  //               SizedBox(height: _isMobile ? 8 : 12),
+
+  //               if (_isMobile)
+  //                 Column(
+  //                   children: [
+  //                     SizedBox(
+  //                       width: double.infinity,
+  //                       child: ElevatedButton.icon(
+  //                         onPressed: () => _toggleInvoiceCollection(
+  //                           invoice['id'],
+  //                           !isCollected,
+  //                         ),
+  //                         icon: Icon(
+  //                           isCollected ? Icons.undo : Icons.check_circle,
+  //                           size: 20,
+  //                         ),
+  //                         label: Text(
+  //                           isCollected ? 'إلغاء التحصيل' : ' تحصيل الفاتوره',
+  //                         ),
+  //                         style: ElevatedButton.styleFrom(
+  //                           backgroundColor: isCollected
+  //                               ? Colors.orange
+  //                               : Colors.green,
+  //                           foregroundColor: Colors.white,
+  //                           padding: const EdgeInsets.symmetric(vertical: 12),
+  //                         ),
+  //                       ),
+  //                     ),
+  //                     const SizedBox(height: 8),
+  //                     SizedBox(
+  //                       width: double.infinity,
+  //                       child: ElevatedButton.icon(
+  //                         onPressed: _isGeneratingPDF
+  //                             ? null
+  //                             : () => _printKartaRequest(invoice),
+  //                         icon: _isGeneratingPDF
+  //                             ? const SizedBox(
+  //                                 width: 20,
+  //                                 height: 20,
+  //                                 child: CircularProgressIndicator(
+  //                                   color: Colors.white,
+  //                                 ),
+  //                               )
+  //                             : const Icon(Icons.credit_card),
+  //                         label: Text(
+  //                           _isGeneratingPDF
+  //                               ? 'جاري الطباعة...'
+  //                               : 'مطالبة كارتات',
+  //                           style: const TextStyle(fontSize: 16),
+  //                         ),
+  //                         style: ElevatedButton.styleFrom(
+  //                           backgroundColor: Color(0xFF9C27B0),
+  //                           foregroundColor: Colors.white,
+  //                           padding: const EdgeInsets.symmetric(vertical: 12),
+  //                         ),
+  //                       ),
+  //                     ),
+  //                     const SizedBox(height: 8),
+  //                     SizedBox(
+  //                       width: double.infinity,
+  //                       child: ElevatedButton.icon(
+  //                         onPressed: _isGeneratingPDF
+  //                             ? null
+  //                             : () => _printInvoice(invoice),
+  //                         icon: _isGeneratingPDF
+  //                             ? const SizedBox(
+  //                                 width: 20,
+  //                                 height: 20,
+  //                                 child: CircularProgressIndicator(
+  //                                   color: Colors.white,
+  //                                 ),
+  //                               )
+  //                             : const Icon(Icons.print),
+  //                         label: Text(
+  //                           _isGeneratingPDF
+  //                               ? 'جاري الطباعة...'
+  //                               : 'طباعة الفاتورة',
+  //                           style: const TextStyle(fontSize: 16),
+  //                         ),
+  //                         style: ElevatedButton.styleFrom(
+  //                           backgroundColor: Color(0xFF2E7D32),
+  //                           foregroundColor: Colors.white,
+  //                           padding: const EdgeInsets.symmetric(vertical: 12),
+  //                         ),
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 )
+  //               else
+  //                 Row(
+  //                   children: [
+  //                     Expanded(
+  //                       child: ElevatedButton.icon(
+  //                         onPressed: () => _toggleInvoiceCollection(
+  //                           invoice['id'],
+  //                           !isCollected,
+  //                         ),
+  //                         icon: Icon(
+  //                           isCollected ? Icons.undo : Icons.check_circle,
+  //                         ),
+  //                         label: Text(
+  //                           isCollected ? 'إلغاء التحصيل' : ' تحصيل الفاتوره',
+  //                         ),
+  //                         style: ElevatedButton.styleFrom(
+  //                           backgroundColor: isCollected
+  //                               ? Colors.orange
+  //                               : Colors.green,
+  //                           foregroundColor: Colors.white,
+  //                           padding: const EdgeInsets.symmetric(vertical: 12),
+  //                         ),
+  //                       ),
+  //                     ),
+  //                     const SizedBox(width: 8),
+  //                     Expanded(
+  //                       child: ElevatedButton.icon(
+  //                         onPressed: _isGeneratingPDF
+  //                             ? null
+  //                             : () => _printKartaRequest(invoice),
+  //                         icon: _isGeneratingPDF
+  //                             ? const SizedBox(
+  //                                 width: 20,
+  //                                 height: 20,
+  //                                 child: CircularProgressIndicator(
+  //                                   color: Colors.white,
+  //                                 ),
+  //                               )
+  //                             : const Icon(Icons.credit_card),
+  //                         label: Text(
+  //                           _isGeneratingPDF
+  //                               ? 'جاري الطباعة...'
+  //                               : 'مطالبة كارتات',
+  //                           style: const TextStyle(fontSize: 16),
+  //                         ),
+  //                         style: ElevatedButton.styleFrom(
+  //                           backgroundColor: Color(0xFF9C27B0),
+  //                           foregroundColor: Colors.white,
+  //                           padding: const EdgeInsets.symmetric(vertical: 12),
+  //                         ),
+  //                       ),
+  //                     ),
+  //                     const SizedBox(width: 8),
+  //                     Expanded(
+  //                       child: ElevatedButton.icon(
+  //                         onPressed: _isGeneratingPDF
+  //                             ? null
+  //                             : () => _printInvoice(invoice),
+  //                         icon: _isGeneratingPDF
+  //                             ? const SizedBox(
+  //                                 width: 20,
+  //                                 height: 20,
+  //                                 child: CircularProgressIndicator(
+  //                                   color: Colors.white,
+  //                                 ),
+  //                               )
+  //                             : const Icon(Icons.print),
+  //                         label: Text(
+  //                           _isGeneratingPDF
+  //                               ? 'جاري الطباعة...'
+  //                               : 'طباعة الفاتورة',
+  //                           style: const TextStyle(fontSize: 16),
+  //                         ),
+  //                         style: ElevatedButton.styleFrom(
+  //                           backgroundColor: Color(0xFF2E7D32),
+  //                           foregroundColor: Colors.white,
+  //                           padding: const EdgeInsets.symmetric(vertical: 12),
+  //                         ),
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //             ],
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildInvoiceSummaryRow(
     String label,
