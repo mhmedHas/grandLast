@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 ; Non-commercial use only
 
-#define MyAppName "new grand company"
+#define MyAppName "grand last"
 #define MyAppVersion "1.5"
 #define MyAppPublisher "My Company, Inc."
 #define MyAppURL "https://www.example.com/"
@@ -14,7 +14,7 @@
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
-AppId={{C5587A74-3A81-4B49-A1F3-C627928A52AF}
+AppId={{9DD23574-384C-4867-BE12-A718350F4995}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
@@ -37,7 +37,7 @@ DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only).
 ;PrivilegesRequired=lowest
 OutputDir=D:\flutter project\new_grand\NewGrandCompaney-master\installer
-OutputBaseFilename=new grand company
+OutputBaseFilename=grand last
 SetupIconFile=D:\flutter project\new_grand\NewGrandCompaney-master\windows\runner\resources\app_icon.ico
 SolidCompression=yes
 WizardStyle=modern dynamic

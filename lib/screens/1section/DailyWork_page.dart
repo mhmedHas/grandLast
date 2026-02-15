@@ -9658,6 +9658,7 @@ class _DailyWorkPageState extends State<DailyWorkPage> {
   final List<String> _vehicleTypes = [
     'جامبو 4طن',
     'جامبو 8طن',
+    'جامبو',
     'تريلا',
     'دبابة',
     'كساحة',
@@ -9665,6 +9666,7 @@ class _DailyWorkPageState extends State<DailyWorkPage> {
   Map<String, bool> _selectedVehicleTypes = {
     'جامبو 4طن': false,
     'جامبو 8طن': false,
+    'جامبو': false,
     'تريلا': false,
     'دبابة': false,
     'كساحة': false,
@@ -11498,21 +11500,21 @@ class _DailyWorkPageState extends State<DailyWorkPage> {
                       ),
                     ),
                     Spacer(),
-                    TextButton(
-                      onPressed: _selectAllVehicleTypes,
-                      child: Text(
-                        _selectedVehicleTypes.values.every(
-                              (selected) => selected,
-                            )
-                            ? 'إلغاء الكل'
-                            : 'تحديد الكل',
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 14,
-                          color: Colors.orange.shade800,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                    // TextButton(
+                    //   onPressed: _selectAllVehicleTypes,
+                    //   child: Text(
+                    //     _selectedVehicleTypes.values.every(
+                    //           (selected) => selected,
+                    //         )
+                    //         ? 'إلغاء الكل'
+                    //         : 'تحديد الكل',
+                    //     style: TextStyle(
+                    //       fontSize: isMobile ? 12 : 14,
+                    //       color: Colors.orange.shade800,
+                    //       fontWeight: FontWeight.bold,
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
                 SizedBox(height: 8),
