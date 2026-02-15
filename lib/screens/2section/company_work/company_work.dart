@@ -2926,7 +2926,12 @@ class _CompanyWorkPageState extends State<CompanyWorkPage> {
       pdf.addPage(
         pdfLib.MultiPage(
           pageFormat: pdfLib.PdfPageFormat.a4,
-          margin: const pdfLib.EdgeInsets.only(right: 60, left: 60),
+          margin: const pdfLib.EdgeInsets.only(
+            right: 60,
+            left: 60,
+            top: 20,
+            bottom: 20,
+          ),
           build: (context) => [
             pdfLib.Directionality(
               textDirection: pdfLib.TextDirection.rtl,
