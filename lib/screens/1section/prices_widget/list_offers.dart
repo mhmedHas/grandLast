@@ -1,3 +1,5756 @@
+// // // // // import 'package:cloud_firestore/cloud_firestore.dart';
+// // // // // import 'package:flutter/material.dart';
+// // // // // import 'package:last/models/models.dart';
+// // // // // import 'package:printing/printing.dart';
+// // // // // import 'package:pdf/pdf.dart';
+// // // // // import 'package:pdf/widgets.dart' as pdfLib;
+// // // // // import 'package:intl/intl.dart';
+// // // // // import 'package:flutter/services.dart';
+// // // // // import 'package:flutter/widgets.dart' as t;
+
+// // // // // class PriceOffersListScreen extends StatefulWidget {
+// // // // //   const PriceOffersListScreen({super.key});
+
+// // // // //   @override
+// // // // //   State<PriceOffersListScreen> createState() => _PriceOffersListScreenState();
+// // // // // }
+
+// // // // // class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
+// // // // //   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+// // // // //   String _searchQuery = '';
+// // // // //   String _activeView = 'companies'; // 'companies' أو 'wheels'
+// // // // //   pdfLib.Font? _arabicFont;
+// // // // //   bool _isGeneratingPDF = false;
+// // // // //   String? _currentCompanyName;
+// // // // //   String? _currentViewType;
+// // // // //   String? _currentCompanyId;
+// // // // //   List<TransportationWithOffer>? _currentTransportations;
+
+// // // // //   @override
+// // // // //   void initState() {
+// // // // //     super.initState();
+// // // // //     _loadArabicFont();
+// // // // //   }
+
+// // // // //   Future<void> _loadArabicFont() async {
+// // // // //     try {
+// // // // //       final fontData = await rootBundle.load(
+// // // // //         'assets/fonts/Amiri/Amiri-Regular.ttf',
+// // // // //       );
+
+// // // // //       _arabicFont = pdfLib.Font.ttf(fontData);
+// // // // //       debugPrint('تم تحميل الخط العربي بنجاح');
+// // // // //     } catch (e) {
+// // // // //       debugPrint('فشل تحميل الخط العربي: $e');
+// // // // //     }
+// // // // //   }
+
+// // // // //   @override
+// // // // //   Widget build(BuildContext context) {
+// // // // //     return Scaffold(
+// // // // //       backgroundColor: const Color(0xFFF4F6F8),
+// // // // //       body: SingleChildScrollView(
+// // // // //         child: Column(
+// // // // //           children: [
+// // // // //             _buildSearchAndStatsBar(),
+// // // // //             Padding(
+// // // // //               padding: const EdgeInsets.only(top: 8),
+// // // // //               child: SizedBox(
+// // // // //                 height: MediaQuery.of(context).size.height * 0.75,
+// // // // //                 child: _buildCompaniesWithOffersList(),
+// // // // //               ),
+// // // // //             ),
+// // // // //           ],
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   Widget _buildSearchAndStatsBar() {
+// // // // //     return Container(
+// // // // //       color: Colors.white,
+// // // // //       padding: const EdgeInsets.all(16),
+// // // // //       child: Column(
+// // // // //         children: [
+// // // // //           // شريط البحث
+// // // // //           Container(
+// // // // //             padding: const EdgeInsets.symmetric(horizontal: 16),
+// // // // //             decoration: BoxDecoration(
+// // // // //               color: const Color(0xFFF4F6F8),
+// // // // //               borderRadius: BorderRadius.circular(12),
+// // // // //               border: Border.all(color: const Color(0xFF3498DB), width: 1.5),
+// // // // //             ),
+// // // // //             child: Row(
+// // // // //               children: [
+// // // // //                 const Icon(Icons.search, color: Color(0xFF3498DB), size: 22),
+// // // // //                 const SizedBox(width: 12),
+// // // // //                 Expanded(
+// // // // //                   child: TextField(
+// // // // //                     onChanged: (value) => setState(() => _searchQuery = value),
+// // // // //                     decoration: const InputDecoration(
+// // // // //                       hintText: 'ابحث عن شركة...',
+// // // // //                       border: InputBorder.none,
+// // // // //                       hintStyle: TextStyle(color: Colors.grey),
+// // // // //                       contentPadding: EdgeInsets.symmetric(vertical: 12),
+// // // // //                     ),
+// // // // //                   ),
+// // // // //                 ),
+// // // // //                 if (_searchQuery.isNotEmpty)
+// // // // //                   GestureDetector(
+// // // // //                     onTap: () => setState(() => _searchQuery = ''),
+// // // // //                     child: const Icon(
+// // // // //                       Icons.clear,
+// // // // //                       size: 20,
+// // // // //                       color: Colors.grey,
+// // // // //                     ),
+// // // // //                   ),
+// // // // //               ],
+// // // // //             ),
+// // // // //           ),
+
+// // // // //           const SizedBox(height: 12),
+
+// // // // //           // الإحصائيات
+// // // // //           _buildStatsBar(),
+// // // // //         ],
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   Widget _buildStatsBar() {
+// // // // //     return StreamBuilder<QuerySnapshot>(
+// // // // //       stream: _firestore.collectionGroup('priceOffers').snapshots(),
+// // // // //       builder: (context, snapshot) {
+// // // // //         if (!snapshot.hasData) {
+// // // // //           return const SizedBox();
+// // // // //         }
+
+// // // // //         int totalCompanies = 0;
+// // // // //         int totalOffers = 0;
+// // // // //         int totalTrips = 0;
+
+// // // // //         // حساب الإحصائيات من البيانات الحالية
+// // // // //         final companiesData = _extractCompaniesData(snapshot.data!);
+// // // // //         totalCompanies = companiesData.length;
+
+// // // // //         for (final company in companiesData) {
+// // // // //           totalOffers += (company['totalOffers'] as num).toInt();
+// // // // //           totalTrips += (company['totalTrips'] as num).toInt();
+// // // // //         }
+// // // // //         return Row(
+// // // // //           children: [
+// // // // //             _buildStatCard('شركات', totalCompanies.toString(), Icons.business),
+// // // // //             const SizedBox(width: 12),
+// // // // //             _buildStatCard('عروض', totalTrips.toString(), Icons.description),
+// // // // //             const SizedBox(width: 12),
+// // // // //           ],
+// // // // //         );
+// // // // //       },
+// // // // //     );
+// // // // //   }
+
+// // // // //   List<Map<String, dynamic>> _extractCompaniesData(QuerySnapshot snapshot) {
+// // // // //     final Map<String, Map<String, dynamic>> companiesMap = {};
+
+// // // // //     for (final doc in snapshot.docs) {
+// // // // //       final data = doc.data() as Map<String, dynamic>;
+// // // // //       final companyId = _extractCompanyIdFromPath(doc.reference.path);
+// // // // //       final companyName = data['companyName'] ?? 'غير معروف';
+
+// // // // //       if (!companiesMap.containsKey(companyId)) {
+// // // // //         companiesMap[companyId] = {
+// // // // //           'companyId': companyId,
+// // // // //           'companyName': companyName,
+// // // // //           'totalOffers': 0,
+// // // // //           'totalTrips': 0,
+// // // // //         };
+// // // // //       }
+
+// // // // //       companiesMap[companyId]!['totalOffers']++;
+// // // // //       final transports = data['transportations'] as List? ?? [];
+// // // // //       companiesMap[companyId]!['totalTrips'] += transports.length;
+// // // // //     }
+
+// // // // //     return companiesMap.values.toList();
+// // // // //   }
+
+// // // // //   String _extractCompanyIdFromPath(String path) {
+// // // // //     final parts = path.split('/');
+// // // // //     return parts[1]; // companies/{companyId}/priceOffers/{offerId}
+// // // // //   }
+
+// // // // //   Widget _buildStatCard(String label, String value, IconData icon) {
+// // // // //     return Expanded(
+// // // // //       child: Container(
+// // // // //         padding: const EdgeInsets.all(12),
+// // // // //         decoration: BoxDecoration(
+// // // // //           color: const Color(0xFF3498DB).withOpacity(0.1),
+// // // // //           borderRadius: BorderRadius.circular(10),
+// // // // //           border: Border.all(color: const Color(0xFF3498DB), width: 1),
+// // // // //         ),
+// // // // //         child: Row(
+// // // // //           children: [
+// // // // //             Icon(icon, color: const Color(0xFF3498DB), size: 24),
+// // // // //             const SizedBox(width: 8),
+// // // // //             Expanded(
+// // // // //               child: Column(
+// // // // //                 crossAxisAlignment: CrossAxisAlignment.start,
+// // // // //                 children: [
+// // // // //                   Text(
+// // // // //                     label,
+// // // // //                     style: const TextStyle(
+// // // // //                       fontSize: 12,
+// // // // //                       color: Colors.grey,
+// // // // //                       fontWeight: FontWeight.w500,
+// // // // //                     ),
+// // // // //                   ),
+// // // // //                   Text(
+// // // // //                     value,
+// // // // //                     style: const TextStyle(
+// // // // //                       fontSize: 18,
+// // // // //                       fontWeight: FontWeight.bold,
+// // // // //                       color: Color(0xFF2C3E50),
+// // // // //                     ),
+// // // // //                   ),
+// // // // //                 ],
+// // // // //               ),
+// // // // //             ),
+// // // // //           ],
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   Widget _buildCompaniesWithOffersList() {
+// // // // //     return StreamBuilder<QuerySnapshot>(
+// // // // //       stream: _firestore.collectionGroup('priceOffers').snapshots(),
+// // // // //       builder: (context, snapshot) {
+// // // // //         if (snapshot.hasError) {
+// // // // //           return Center(
+// // // // //             child: Column(
+// // // // //               mainAxisAlignment: MainAxisAlignment.center,
+// // // // //               children: [
+// // // // //                 const Icon(Icons.error, size: 64, color: Colors.red),
+// // // // //                 const SizedBox(height: 16),
+// // // // //                 Text('خطأ: ${snapshot.error}', textAlign: TextAlign.center),
+// // // // //               ],
+// // // // //             ),
+// // // // //           );
+// // // // //         }
+
+// // // // //         if (snapshot.connectionState == ConnectionState.waiting) {
+// // // // //           return const Center(child: CircularProgressIndicator());
+// // // // //         }
+
+// // // // //         final companiesWithOffers = _extractCompaniesData(snapshot.data!);
+
+// // // // //         final filteredCompanies = companiesWithOffers.where((company) {
+// // // // //           if (_searchQuery.isEmpty) return true;
+// // // // //           final companyName =
+// // // // //               company['companyName']?.toString().toLowerCase() ?? '';
+// // // // //           return companyName.contains(_searchQuery.toLowerCase());
+// // // // //         }).toList();
+
+// // // // //         if (filteredCompanies.isEmpty) {
+// // // // //           return Center(
+// // // // //             child: Column(
+// // // // //               mainAxisAlignment: MainAxisAlignment.center,
+// // // // //               children: [
+// // // // //                 const Icon(Icons.business, size: 80, color: Colors.grey),
+// // // // //                 const SizedBox(height: 16),
+// // // // //                 const Text(
+// // // // //                   'لا توجد شركات لديها عروض أسعار',
+// // // // //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+// // // // //                 ),
+// // // // //                 const SizedBox(height: 8),
+// // // // //                 Text(
+// // // // //                   _searchQuery.isEmpty
+// // // // //                       ? 'أضف عرض سعر جديد للبدء'
+// // // // //                       : 'لم يتم العثور على نتائج البحث',
+// // // // //                   style: const TextStyle(color: Colors.grey, fontSize: 14),
+// // // // //                 ),
+// // // // //               ],
+// // // // //             ),
+// // // // //           );
+// // // // //         }
+
+// // // // //         return ListView.builder(
+// // // // //           shrinkWrap: true,
+// // // // //           physics: const NeverScrollableScrollPhysics(),
+// // // // //           padding: const EdgeInsets.all(16),
+// // // // //           itemCount: filteredCompanies.length,
+// // // // //           itemBuilder: (context, index) {
+// // // // //             final companyData = filteredCompanies[index];
+// // // // //             return _buildCompanyWithAllOffersItem(companyData);
+// // // // //           },
+// // // // //         );
+// // // // //       },
+// // // // //     );
+// // // // //   }
+
+// // // // //   Widget _buildCompanyWithAllOffersItem(Map<String, dynamic> companyData) {
+// // // // //     final String companyName = companyData['companyName'];
+// // // // //     final String companyId = companyData['companyId'];
+// // // // //     final int totalOffers = companyData['totalOffers'];
+// // // // //     final int totalTrips = companyData['totalTrips'];
+
+// // // // //     return Container(
+// // // // //       margin: const EdgeInsets.only(bottom: 12),
+// // // // //       decoration: BoxDecoration(
+// // // // //         color: Colors.white,
+// // // // //         borderRadius: BorderRadius.circular(12),
+// // // // //         border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3)),
+// // // // //         boxShadow: [
+// // // // //           BoxShadow(
+// // // // //             color: Colors.black.withOpacity(0.05),
+// // // // //             blurRadius: 8,
+// // // // //             offset: const Offset(0, 2),
+// // // // //           ),
+// // // // //         ],
+// // // // //       ),
+// // // // //       child: ListTile(
+// // // // //         leading: Container(
+// // // // //           padding: const EdgeInsets.all(8),
+// // // // //           decoration: BoxDecoration(
+// // // // //             color: const Color(0xFF3498DB).withOpacity(0.1),
+// // // // //             borderRadius: BorderRadius.circular(8),
+// // // // //           ),
+// // // // //           child: const Icon(Icons.business, color: Color(0xFF3498DB), size: 24),
+// // // // //         ),
+// // // // //         title: Text(
+// // // // //           companyName,
+// // // // //           style: const TextStyle(
+// // // // //             fontSize: 16,
+// // // // //             fontWeight: FontWeight.bold,
+// // // // //             color: Color(0xFF2C3E50),
+// // // // //           ),
+// // // // //         ),
+// // // // //         subtitle: Text(
+// // // // //           '$totalTrips عروض السعر :',
+// // // // //           style: const TextStyle(fontSize: 12, color: Colors.grey),
+// // // // //         ),
+// // // // //         trailing: Row(
+// // // // //           mainAxisSize: MainAxisSize.min,
+// // // // //           children: [
+// // // // //             _buildActionButton(
+// // // // //               icon: Icons.business,
+// // // // //               label: 'الشركات',
+// // // // //               color: Colors.blue,
+// // // // //               onPressed: () {
+// // // // //                 setState(() => _activeView = 'companies');
+// // // // //                 _showAllCompanyOffers(companyId, companyName, 'companies');
+// // // // //               },
+// // // // //             ),
+// // // // //             const SizedBox(width: 8),
+// // // // //             _buildActionButton(
+// // // // //               icon: Icons.directions_bus,
+// // // // //               label: 'العجل',
+// // // // //               color: Colors.purple,
+// // // // //               onPressed: () {
+// // // // //                 setState(() => _activeView = 'wheels');
+// // // // //                 _showAllCompanyOffers(companyId, companyName, 'wheels');
+// // // // //               },
+// // // // //             ),
+// // // // //           ],
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   void _showAllCompanyOffers(
+// // // // //     String companyId,
+// // // // //     String companyName,
+// // // // //     String viewType,
+// // // // //   ) {
+// // // // //     _currentCompanyId = companyId;
+// // // // //     _currentCompanyName = companyName;
+// // // // //     _currentViewType = viewType;
+
+// // // // //     showDialog(
+// // // // //       context: context,
+// // // // //       builder: (context) => Directionality(
+// // // // //         textDirection: t.TextDirection.rtl,
+// // // // //         child: Dialog(
+// // // // //           backgroundColor: Colors.transparent,
+// // // // //           insetPadding: const EdgeInsets.all(16),
+// // // // //           child: Container(
+// // // // //             width: MediaQuery.of(context).size.width * 0.95,
+// // // // //             constraints: BoxConstraints(
+// // // // //               maxHeight: MediaQuery.of(context).size.height * 0.9,
+// // // // //             ),
+// // // // //             padding: const EdgeInsets.all(20),
+// // // // //             decoration: BoxDecoration(
+// // // // //               color: Colors.white,
+// // // // //               borderRadius: BorderRadius.circular(16),
+// // // // //               boxShadow: [
+// // // // //                 BoxShadow(
+// // // // //                   color: Colors.black.withOpacity(0.15),
+// // // // //                   blurRadius: 20,
+// // // // //                 ),
+// // // // //               ],
+// // // // //             ),
+// // // // //             child: Column(
+// // // // //               mainAxisSize: MainAxisSize.min,
+// // // // //               children: [
+// // // // //                 // العنوان
+// // // // //                 Row(
+// // // // //                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// // // // //                   children: [
+// // // // //                     Row(
+// // // // //                       mainAxisSize: MainAxisSize.min,
+// // // // //                       children: [
+// // // // //                         // زر الطباعة
+// // // // //                         IconButton(
+// // // // //                           icon: Icon(Icons.print, color: Colors.green[700]),
+// // // // //                           onPressed: () => _generatePDF(),
+// // // // //                         ),
+// // // // //                         // زر الإغلاق
+// // // // //                         IconButton(
+// // // // //                           icon: const Icon(Icons.close),
+// // // // //                           onPressed: () => Navigator.pop(context),
+// // // // //                         ),
+// // // // //                       ],
+// // // // //                     ),
+// // // // //                     Column(
+// // // // //                       children: [
+// // // // //                         Text(
+// // // // //                           viewType == 'companies'
+// // // // //                               ? 'عروض اسعار الشركات - $companyName'
+// // // // //                               : 'عروض اسعار العجل - $companyName',
+// // // // //                           style: const TextStyle(
+// // // // //                             fontSize: 20,
+// // // // //                             fontWeight: FontWeight.bold,
+// // // // //                             color: Color(0xFF2C3E50),
+// // // // //                           ),
+// // // // //                         ),
+// // // // //                         const SizedBox(height: 4),
+// // // // //                       ],
+// // // // //                     ),
+// // // // //                     const SizedBox(width: 48),
+// // // // //                   ],
+// // // // //                 ),
+
+// // // // //                 const SizedBox(height: 8),
+// // // // //                 Divider(color: const Color(0xFF3498DB).withOpacity(0.3)),
+
+// // // // //                 // إحصائيات الشركة
+// // // // //                 Container(
+// // // // //                   padding: const EdgeInsets.all(12),
+// // // // //                   decoration: BoxDecoration(
+// // // // //                     color: const Color(0xFF3498DB).withOpacity(0.1),
+// // // // //                     borderRadius: BorderRadius.circular(10),
+// // // // //                   ),
+// // // // //                   child: Row(
+// // // // //                     mainAxisAlignment: MainAxisAlignment.spaceAround,
+// // // // //                     children: [
+// // // // //                       Column(
+// // // // //                         children: [
+// // // // //                           const Text(
+// // // // //                             'اسم الشركة',
+// // // // //                             style: TextStyle(fontSize: 11, color: Colors.grey),
+// // // // //                           ),
+// // // // //                           Text(
+// // // // //                             companyName,
+// // // // //                             style: const TextStyle(
+// // // // //                               fontSize: 16,
+// // // // //                               fontWeight: FontWeight.bold,
+// // // // //                               color: Color(0xFF2C3E50),
+// // // // //                             ),
+// // // // //                           ),
+// // // // //                         ],
+// // // // //                       ),
+// // // // //                       Column(
+// // // // //                         children: [
+// // // // //                           const Text(
+// // // // //                             'إجمالي العروض',
+// // // // //                             style: TextStyle(fontSize: 11, color: Colors.grey),
+// // // // //                           ),
+// // // // //                           StreamBuilder<QuerySnapshot>(
+// // // // //                             stream: _firestore
+// // // // //                                 .collection('companies')
+// // // // //                                 .doc(companyId)
+// // // // //                                 .collection('priceOffers')
+// // // // //                                 .snapshots(),
+// // // // //                             builder: (context, snapshot) {
+// // // // //                               int totalTrips = 0;
+// // // // //                               if (snapshot.hasData) {
+// // // // //                                 for (final doc in snapshot.data!.docs) {
+// // // // //                                   final data =
+// // // // //                                       doc.data() as Map<String, dynamic>;
+// // // // //                                   final transports =
+// // // // //                                       data['transportations'] as List? ?? [];
+// // // // //                                   totalTrips += transports.length;
+// // // // //                                 }
+// // // // //                               }
+// // // // //                               return Text(
+// // // // //                                 '$totalTrips',
+// // // // //                                 style: const TextStyle(
+// // // // //                                   fontSize: 16,
+// // // // //                                   fontWeight: FontWeight.bold,
+// // // // //                                   color: Color(0xFF2C3E50),
+// // // // //                                 ),
+// // // // //                               );
+// // // // //                             },
+// // // // //                           ),
+// // // // //                         ],
+// // // // //                       ),
+// // // // //                     ],
+// // // // //                   ),
+// // // // //                 ),
+
+// // // // //                 const SizedBox(height: 16),
+
+// // // // //                 // الجدول
+// // // // //                 Expanded(child: _buildCompanyOffersTable(companyId, viewType)),
+
+// // // // //                 const SizedBox(height: 16),
+
+// // // // //                 // زر الإغلاق
+// // // // //                 Row(
+// // // // //                   mainAxisAlignment: MainAxisAlignment.center,
+// // // // //                   children: [
+// // // // //                     ElevatedButton(
+// // // // //                       onPressed: () => _generatePDF(),
+// // // // //                       style: ElevatedButton.styleFrom(
+// // // // //                         backgroundColor: const Color.fromARGB(255, 255, 0, 0),
+// // // // //                         foregroundColor: Colors.white,
+// // // // //                         elevation: 2,
+// // // // //                         padding: const EdgeInsets.symmetric(
+// // // // //                           horizontal: 40,
+// // // // //                           vertical: 12,
+// // // // //                         ),
+// // // // //                         shape: RoundedRectangleBorder(
+// // // // //                           borderRadius: BorderRadius.circular(8),
+// // // // //                         ),
+// // // // //                       ),
+// // // // //                       child: Row(
+// // // // //                         children: [
+// // // // //                           Icon(
+// // // // //                             Icons.print,
+// // // // //                             color: const Color.fromARGB(255, 255, 255, 255),
+// // // // //                           ),
+
+// // // // //                           // Text('طباعه'),
+// // // // //                         ],
+// // // // //                       ),
+// // // // //                     ),
+// // // // //                     SizedBox(width: 10),
+
+// // // // //                     ElevatedButton(
+// // // // //                       onPressed: () => Navigator.pop(context),
+// // // // //                       style: ElevatedButton.styleFrom(
+// // // // //                         backgroundColor: const Color(0xFF3498DB),
+// // // // //                         foregroundColor: Colors.white,
+// // // // //                         elevation: 2,
+// // // // //                         padding: const EdgeInsets.symmetric(
+// // // // //                           horizontal: 40,
+// // // // //                           vertical: 12,
+// // // // //                         ),
+// // // // //                         shape: RoundedRectangleBorder(
+// // // // //                           borderRadius: BorderRadius.circular(8),
+// // // // //                         ),
+// // // // //                       ),
+// // // // //                       child: const Text('إغلاق'),
+// // // // //                     ),
+// // // // //                   ],
+// // // // //                 ),
+// // // // //               ],
+// // // // //             ),
+// // // // //           ),
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   Widget _buildCompanyOffersTable(String companyId, String viewType) {
+// // // // //     return StreamBuilder<QuerySnapshot>(
+// // // // //       stream: _firestore
+// // // // //           .collection('companies')
+// // // // //           .doc(companyId)
+// // // // //           .collection('priceOffers')
+// // // // //           .orderBy('updatedAt', descending: true)
+// // // // //           .snapshots(),
+// // // // //       builder: (context, snapshot) {
+// // // // //         if (snapshot.connectionState == ConnectionState.waiting) {
+// // // // //           return const Center(child: CircularProgressIndicator());
+// // // // //         }
+
+// // // // //         if (snapshot.hasError) {
+// // // // //           return Center(
+// // // // //             child: Column(
+// // // // //               mainAxisAlignment: MainAxisAlignment.center,
+// // // // //               children: [
+// // // // //                 const Icon(Icons.error, size: 48, color: Colors.red),
+// // // // //                 const SizedBox(height: 8),
+// // // // //                 Text(
+// // // // //                   'خطأ في تحميل البيانات: ${snapshot.error}',
+// // // // //                   textAlign: TextAlign.center,
+// // // // //                   style: const TextStyle(fontSize: 14, color: Colors.red),
+// // // // //                 ),
+// // // // //               ],
+// // // // //             ),
+// // // // //           );
+// // // // //         }
+
+// // // // //         final offers = snapshot.data!.docs.map((doc) {
+// // // // //           final data = doc.data() as Map<String, dynamic>;
+// // // // //           return PriceOffer.fromMap(data, doc.id);
+// // // // //         }).toList();
+
+// // // // //         if (offers.isEmpty) {
+// // // // //           return const Center(
+// // // // //             child: Column(
+// // // // //               mainAxisAlignment: MainAxisAlignment.center,
+// // // // //               children: [
+// // // // //                 Icon(Icons.description, size: 64, color: Colors.grey),
+// // // // //                 SizedBox(height: 16),
+// // // // //                 Text(
+// // // // //                   'لا توجد عروض أسعار',
+// // // // //                   style: TextStyle(fontSize: 16, color: Colors.grey),
+// // // // //                 ),
+// // // // //               ],
+// // // // //             ),
+// // // // //           );
+// // // // //         }
+
+// // // // //         // جمع كل الرحلات من كل العروض
+// // // // //         List<TransportationWithOffer> allTransportations = [];
+// // // // //         for (final offer in offers) {
+// // // // //           for (final transport in offer.transportations) {
+// // // // //             allTransportations.add(
+// // // // //               TransportationWithOffer(
+// // // // //                 transportation: transport,
+// // // // //                 offerId: offer.id,
+// // // // //                 companyId: companyId,
+// // // // //                 offer: offer,
+// // // // //               ),
+// // // // //             );
+// // // // //           }
+// // // // //         }
+
+// // // // //         // حفظ البيانات للطباعة
+// // // // //         _currentTransportations = allTransportations;
+
+// // // // //         return viewType == 'companies'
+// // // // //             ? _buildCompaniesTable(allTransportations)
+// // // // //             : _buildWheelsTable(allTransportations);
+// // // // //       },
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= إنشاء PDF =================
+// // // // //   Future<void> _generatePDF() async {
+// // // // //     if (_arabicFont == null) {
+// // // // //       ScaffoldMessenger.of(
+// // // // //         context,
+// // // // //       ).showSnackBar(const SnackBar(content: Text('الخط العربي غير محمل')));
+// // // // //       return;
+// // // // //     }
+
+// // // // //     if (_currentCompanyName == null ||
+// // // // //         _currentViewType == null ||
+// // // // //         _currentTransportations == null) {
+// // // // //       ScaffoldMessenger.of(
+// // // // //         context,
+// // // // //       ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للطباعة')));
+// // // // //       return;
+// // // // //     }
+
+// // // // //     setState(() => _isGeneratingPDF = true);
+
+// // // // //     try {
+// // // // //       // إنشاء PDF
+// // // // //       final pdf = pdfLib.Document(
+// // // // //         theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
+// // // // //       );
+
+// // // // //       // تقسيم البيانات إلى صفحات (25 صف لكل صفحة)
+// // // // //       final pages = _splitDataIntoPages(_currentTransportations!);
+
+// // // // //       for (int pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+// // // // //         pdf.addPage(
+// // // // //           pdfLib.Page(
+// // // // //             pageFormat: PdfPageFormat.a4,
+// // // // //             margin: pdfLib.EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+// // // // //             build: (context) {
+// // // // //               return pdfLib.Column(
+// // // // //                 crossAxisAlignment: pdfLib.CrossAxisAlignment.stretch,
+// // // // //                 children: [
+// // // // //                   // 1. الهيدر - أعلى الصفحة مباشرة
+// // // // //                   _buildPdfHeader(),
+// // // // //                   pdfLib.SizedBox(height: 10),
+
+// // // // //                   // 2. العنوان
+// // // // //                   _buildPdfTitle(),
+// // // // //                   pdfLib.SizedBox(height: 10),
+
+// // // // //                   // 3. إحصائيات العدد
+// // // // //                   _buildPdfStats(_currentTransportations!.length),
+// // // // //                   pdfLib.SizedBox(height: 10),
+
+// // // // //                   // 4. الجدول - يأخذ المساحة المتبقية
+// // // // //                   pdfLib.Expanded(
+// // // // //                     child: _currentViewType == 'companies'
+// // // // //                         ? _buildCompaniesPdfTablePage(
+// // // // //                             pages[pageIndex],
+// // // // //                             pageIndex,
+// // // // //                           )
+// // // // //                         : _buildWheelsPdfTablePage(pages[pageIndex], pageIndex),
+// // // // //                   ),
+
+// // // // //                   // 5. رقم الصفحة (إذا كان هناك أكثر من صفحة)
+// // // // //                   if (pages.length > 1) pdfLib.SizedBox(height: 15),
+// // // // //                   if (pages.length > 1)
+// // // // //                     _buildPageNumber(pageIndex + 1, pages.length),
+// // // // //                 ],
+// // // // //               );
+// // // // //             },
+// // // // //           ),
+// // // // //         );
+// // // // //       }
+
+// // // // //       // طباعة PDF
+// // // // //       await Printing.layoutPdf(
+// // // // //         onLayout: (PdfPageFormat format) async => pdf.save(),
+// // // // //         name: _getPDFFileName(),
+// // // // //       );
+// // // // //     } catch (e) {
+// // // // //       ScaffoldMessenger.of(
+// // // // //         context,
+// // // // //       ).showSnackBar(SnackBar(content: Text('حدث خطأ في إنشاء PDF: $e')));
+// // // // //     } finally {
+// // // // //       setState(() => _isGeneratingPDF = false);
+// // // // //     }
+// // // // //   }
+
+// // // // //   // ================= تقسيم البيانات إلى صفحات =================
+// // // // //   List<List<TransportationWithOffer>> _splitDataIntoPages(
+// // // // //     List<TransportationWithOffer> transportations,
+// // // // //   ) {
+// // // // //     List<List<TransportationWithOffer>> pages = [];
+// // // // //     List<TransportationWithOffer> currentPage = [];
+
+// // // // //     // حوالي 25-30 صف لكل صفحة A4
+// // // // //     int rowsPerPage = 25;
+
+// // // // //     for (int i = 0; i < transportations.length; i++) {
+// // // // //       currentPage.add(transportations[i]);
+
+// // // // //       // إذا وصلنا إلى العدد المحدد أو كانت آخر دفعة
+// // // // //       if ((i + 1) % rowsPerPage == 0 || i == transportations.length - 1) {
+// // // // //         pages.add(List.from(currentPage));
+// // // // //         currentPage.clear();
+// // // // //       }
+// // // // //     }
+
+// // // // //     return pages;
+// // // // //   }
+
+// // // // //   // ================= بناء الهيدر =================
+// // // // //   pdfLib.Widget _buildPdfHeader() {
+// // // // //     return pdfLib.Directionality(
+// // // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // // //       child: pdfLib.Row(
+// // // // //         mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+// // // // //         children: [
+// // // // //           pdfLib.Text(
+// // // // //             'FM 454.4 - 203/317/21',
+// // // // //             style: pdfLib.TextStyle(
+// // // // //               fontSize: 12,
+// // // // //               fontWeight: pdfLib.FontWeight.bold,
+// // // // //               font: _arabicFont,
+// // // // //             ),
+// // // // //           ),
+// // // // //           pdfLib.Text(
+// // // // //             _currentViewType == 'companies'
+// // // // //                 ? 'عروض أسعار الشركات'
+// // // // //                 : 'عروض أسعار العجل',
+// // // // //             style: pdfLib.TextStyle(
+// // // // //               fontSize: 18,
+// // // // //               fontWeight: pdfLib.FontWeight.bold,
+// // // // //               font: _arabicFont,
+// // // // //             ),
+// // // // //           ),
+// // // // //         ],
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= بناء العنوان =================
+// // // // //   pdfLib.Widget _buildPdfTitle() {
+// // // // //     return pdfLib.Directionality(
+// // // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // // //       child: pdfLib.Column(
+// // // // //         children: [
+// // // // //           pdfLib.Text(
+// // // // //             _currentCompanyName!,
+// // // // //             style: pdfLib.TextStyle(
+// // // // //               fontSize: 16,
+// // // // //               fontWeight: pdfLib.FontWeight.bold,
+// // // // //               font: _arabicFont,
+// // // // //             ),
+// // // // //             textAlign: pdfLib.TextAlign.center,
+// // // // //           ),
+// // // // //           pdfLib.SizedBox(height: 5),
+// // // // //           pdfLib.Text(
+// // // // //             'تاريخ الطباعة: ${DateFormat('yyyy/MM/dd').format(DateTime.now())}',
+// // // // //             style: pdfLib.TextStyle(fontSize: 11, font: _arabicFont),
+// // // // //           ),
+// // // // //         ],
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= بناء الإحصائيات =================
+// // // // //   pdfLib.Widget _buildPdfStats(int total) {
+// // // // //     return pdfLib.Directionality(
+// // // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // // //       child: pdfLib.Container(
+// // // // //         padding: pdfLib.EdgeInsets.all(8),
+// // // // //         decoration: pdfLib.BoxDecoration(
+// // // // //           border: pdfLib.Border.all(color: PdfColors.black, width: 1.5),
+// // // // //         ),
+// // // // //         child: pdfLib.Row(
+// // // // //           mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+// // // // //           children: [
+// // // // //             pdfLib.Text(
+// // // // //               'إجمالي العروض',
+// // // // //               style: pdfLib.TextStyle(
+// // // // //                 fontSize: 14,
+// // // // //                 fontWeight: pdfLib.FontWeight.bold,
+// // // // //                 font: _arabicFont,
+// // // // //               ),
+// // // // //             ),
+// // // // //             pdfLib.Text(
+// // // // //               '$total',
+// // // // //               style: pdfLib.TextStyle(
+// // // // //                 fontSize: 16,
+// // // // //                 fontWeight: pdfLib.FontWeight.bold,
+// // // // //                 font: _arabicFont,
+// // // // //               ),
+// // // // //             ),
+// // // // //           ],
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= بناء جدول الشركات للصفحة =================
+// // // // //   pdfLib.Widget _buildCompaniesPdfTablePage(
+// // // // //     List<TransportationWithOffer> transportations,
+// // // // //     int pageIndex,
+// // // // //   ) {
+// // // // //     return pdfLib.Directionality(
+// // // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // // //       child: pdfLib.Table(
+// // // // //         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
+// // // // //         columnWidths: {
+// // // // //           6: pdfLib.FlexColumnWidth(0.4), // م
+// // // // //           5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
+// // // // //           4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
+// // // // //           3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
+// // // // //           2: pdfLib.FlexColumnWidth(1.0), // النولون
+// // // // //           1: pdfLib.FlexColumnWidth(1.0), // المبيت
+// // // // //           0: pdfLib.FlexColumnWidth(1.0), // العطلة
+// // // // //         },
+// // // // //         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
+// // // // //         children: [
+// // // // //           // رأس الجدول
+// // // // //           pdfLib.TableRow(
+// // // // //             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
+// // // // //             children: [
+// // // // //               _buildCompactHeaderCell('العطلة'),
+// // // // //               _buildCompactHeaderCell('المبيت'),
+// // // // //               _buildCompactHeaderCell('النولون'),
+// // // // //               _buildCompactHeaderCell('نوع العربية'),
+// // // // //               _buildCompactHeaderCell('مكان التعتيق'),
+// // // // //               _buildCompactHeaderCell('مكان التحميل'),
+// // // // //               _buildCompactHeaderCell('م'),
+// // // // //             ],
+// // // // //           ),
+
+// // // // //           // بيانات الجدول
+// // // // //           ...transportations.asMap().entries.map((entry) {
+// // // // //             int index = (pageIndex * 25) + entry.key + 1;
+// // // // //             final item = entry.value;
+// // // // //             final transport = item.transportation;
+
+// // // // //             return pdfLib.TableRow(
+// // // // //               decoration: entry.key % 2 == 0
+// // // // //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
+// // // // //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
+// // // // //               children: [
+// // // // //                 _buildCompactDataCell('${transport.companyHoliday}'),
+// // // // //                 _buildCompactDataCell('${transport.companyOvernight}'),
+// // // // //                 _buildCompactDataCell('${transport.nolon}'),
+// // // // //                 _buildCompactDataCell(transport.vehicleType),
+// // // // //                 _buildCompactDataCell(transport.unloadingLocation),
+// // // // //                 _buildCompactDataCell(transport.loadingLocation),
+// // // // //                 _buildCompactDataCell(index.toString()),
+// // // // //               ],
+// // // // //             );
+// // // // //           }),
+// // // // //         ],
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= بناء جدول العجل للصفحة =================
+// // // // //   pdfLib.Widget _buildWheelsPdfTablePage(
+// // // // //     List<TransportationWithOffer> transportations,
+// // // // //     int pageIndex,
+// // // // //   ) {
+// // // // //     return pdfLib.Directionality(
+// // // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // // //       child: pdfLib.Table(
+// // // // //         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
+// // // // //         columnWidths: {
+// // // // //           6: pdfLib.FlexColumnWidth(0.4), // م
+// // // // //           5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
+// // // // //           4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
+// // // // //           3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
+// // // // //           2: pdfLib.FlexColumnWidth(1.0), // النولون
+// // // // //           1: pdfLib.FlexColumnWidth(1.0), // المبيت
+// // // // //           0: pdfLib.FlexColumnWidth(1.0), // العطلة
+// // // // //         },
+// // // // //         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
+// // // // //         children: [
+// // // // //           // رأس الجدول
+// // // // //           pdfLib.TableRow(
+// // // // //             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
+// // // // //             children: [
+// // // // //               _buildCompactHeaderCell('العطلة'),
+// // // // //               _buildCompactHeaderCell('المبيت'),
+// // // // //               _buildCompactHeaderCell('النولون'),
+// // // // //               _buildCompactHeaderCell('نوع العربية'),
+// // // // //               _buildCompactHeaderCell('مكان التعتيق'),
+// // // // //               _buildCompactHeaderCell('مكان التحميل'),
+// // // // //               _buildCompactHeaderCell('م'),
+// // // // //             ],
+// // // // //           ),
+
+// // // // //           // بيانات الجدول
+// // // // //           ...transportations.asMap().entries.map((entry) {
+// // // // //             int index = (pageIndex * 25) + entry.key + 1;
+// // // // //             final item = entry.value;
+// // // // //             final transport = item.transportation;
+
+// // // // //             return pdfLib.TableRow(
+// // // // //               decoration: entry.key % 2 == 0
+// // // // //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
+// // // // //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
+// // // // //               children: [
+// // // // //                 _buildCompactDataCell('${transport.wheelHoliday}'),
+// // // // //                 _buildCompactDataCell('${transport.wheelOvernight}'),
+// // // // //                 _buildCompactDataCell('${transport.wheelNolon}'),
+// // // // //                 _buildCompactDataCell(transport.vehicleType),
+// // // // //                 _buildCompactDataCell(transport.unloadingLocation),
+// // // // //                 _buildCompactDataCell(transport.loadingLocation),
+// // // // //                 _buildCompactDataCell(index.toString()),
+// // // // //               ],
+// // // // //             );
+// // // // //           }),
+// // // // //         ],
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= بناء خلية رأس مضغوطة =================
+// // // // //   pdfLib.Widget _buildCompactHeaderCell(String text) {
+// // // // //     return pdfLib.Container(
+// // // // //       padding: pdfLib.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+// // // // //       child: pdfLib.Text(
+// // // // //         text,
+// // // // //         style: pdfLib.TextStyle(
+// // // // //           fontSize: 11,
+// // // // //           fontWeight: pdfLib.FontWeight.bold,
+// // // // //           font: _arabicFont,
+// // // // //           color: PdfColors.black,
+// // // // //         ),
+// // // // //         textAlign: pdfLib.TextAlign.center,
+// // // // //         maxLines: 2,
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= بناء خلية بيانات مضغوطة =================
+// // // // //   pdfLib.Widget _buildCompactDataCell(String text) {
+// // // // //     return pdfLib.Container(
+// // // // //       padding: pdfLib.EdgeInsets.symmetric(vertical: 5, horizontal: 3),
+// // // // //       child: pdfLib.Text(
+// // // // //         text,
+// // // // //         style: pdfLib.TextStyle(
+// // // // //           fontSize: 10,
+// // // // //           font: _arabicFont,
+// // // // //           color: PdfColors.black,
+// // // // //         ),
+// // // // //         textAlign: pdfLib.TextAlign.center,
+// // // // //         maxLines: 2,
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= بناء رقم الصفحة =================
+// // // // //   pdfLib.Widget _buildPageNumber(int currentPage, int totalPages) {
+// // // // //     return pdfLib.Directionality(
+// // // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // // //       child: pdfLib.Container(
+// // // // //         alignment: pdfLib.Alignment.center,
+// // // // //         child: pdfLib.Text(
+// // // // //           'الصفحة $currentPage من $totalPages',
+// // // // //           style: pdfLib.TextStyle(
+// // // // //             fontSize: 10,
+// // // // //             font: _arabicFont,
+// // // // //             color: PdfColors.grey600,
+// // // // //           ),
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // ================= الحصول على اسم الملف =================
+// // // // //   String _getPDFFileName() {
+// // // // //     final now = DateTime.now();
+// // // // //     final formattedDate = DateFormat('yyyyMMdd').format(now);
+// // // // //     final viewTypeText = _currentViewType == 'companies' ? 'شركات' : 'عجل';
+// // // // //     return 'عروض_اسعار_${viewTypeText}_${_currentCompanyName}_$formattedDate';
+// // // // //   }
+
+// // // // //   Widget _buildCompaniesTable(List<TransportationWithOffer> transportations) {
+// // // // //     return Container(
+// // // // //       decoration: BoxDecoration(
+// // // // //         borderRadius: BorderRadius.circular(10),
+// // // // //         border: Border.all(color: Colors.transparent, width: 1.5),
+// // // // //       ),
+// // // // //       child: SingleChildScrollView(
+// // // // //         scrollDirection: Axis.horizontal,
+// // // // //         child: SingleChildScrollView(
+// // // // //           scrollDirection: Axis.vertical,
+// // // // //           child: Table(
+// // // // //             defaultColumnWidth: const FixedColumnWidth(150),
+// // // // //             border: TableBorder.all(color: const Color(0xFF3498DB), width: 1),
+// // // // //             children: [
+// // // // //               /// ✅ العناوين - جدول الشركات
+// // // // //               TableRow(
+// // // // //                 decoration: BoxDecoration(
+// // // // //                   color: const Color(0xFF3498DB).withOpacity(0.15),
+// // // // //                 ),
+// // // // //                 children: const [
+// // // // //                   _TableCellHeader('م'),
+// // // // //                   _TableCellHeader('مكان التحميل'),
+// // // // //                   _TableCellHeader('مكان التعتيق'),
+// // // // //                   _TableCellHeader('نوع العربية'),
+// // // // //                   _TableCellHeader('النولون'),
+// // // // //                   _TableCellHeader('المبيت'),
+// // // // //                   _TableCellHeader('العطلة'),
+// // // // //                   _TableCellHeader('الإجراءات'),
+// // // // //                 ],
+// // // // //               ),
+
+// // // // //               /// ✅ الصفوف - جدول الشركات
+// // // // //               ...transportations.asMap().entries.map((entry) {
+// // // // //                 final index = entry.key;
+// // // // //                 final item = entry.value;
+// // // // //                 final transport = item.transportation;
+
+// // // // //                 return TableRow(
+// // // // //                   decoration: BoxDecoration(
+// // // // //                     color: index.isEven
+// // // // //                         ? Colors.white
+// // // // //                         : const Color(0xFFF8F9FA),
+// // // // //                   ),
+// // // // //                   children: [
+// // // // //                     _TableCellBody('${index + 1}'),
+// // // // //                     _TableCellBody(transport.loadingLocation),
+// // // // //                     _TableCellBody(transport.unloadingLocation),
+// // // // //                     _TableCellBody(transport.vehicleType),
+// // // // //                     _TableCellBody('${transport.nolon} ج'),
+// // // // //                     _TableCellBody('${transport.companyOvernight} ج'),
+// // // // //                     _TableCellBody('${transport.companyHoliday} ج'),
+// // // // //                     _TableCellActions(
+// // // // //                       onEdit: () => _editTransportation(item, 'companies'),
+// // // // //                       onDelete: () => _deleteTransportation(item),
+// // // // //                     ),
+// // // // //                   ],
+// // // // //                 );
+// // // // //               }),
+// // // // //             ],
+// // // // //           ),
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   Widget _buildWheelsTable(List<TransportationWithOffer> transportations) {
+// // // // //     return Container(
+// // // // //       decoration: BoxDecoration(
+// // // // //         borderRadius: BorderRadius.circular(10),
+// // // // //         border: Border.all(color: Colors.transparent, width: 1.5),
+// // // // //       ),
+// // // // //       child: SingleChildScrollView(
+// // // // //         scrollDirection: Axis.horizontal,
+// // // // //         child: SingleChildScrollView(
+// // // // //           scrollDirection: Axis.vertical,
+// // // // //           child: Table(
+// // // // //             defaultColumnWidth: const FixedColumnWidth(150),
+// // // // //             border: TableBorder.all(color: const Color(0xFF6A1B9A), width: 1),
+// // // // //             children: [
+// // // // //               /// ✅ العناوين - جدول العجل
+// // // // //               TableRow(
+// // // // //                 decoration: BoxDecoration(
+// // // // //                   color: const Color(0xFF6A1B9A).withOpacity(0.15),
+// // // // //                 ),
+// // // // //                 children: const [
+// // // // //                   _TableCellHeader('م'),
+// // // // //                   _TableCellHeader('مكان التحميل'),
+// // // // //                   _TableCellHeader('مكان التعتيق'),
+// // // // //                   _TableCellHeader('نوع العربية'),
+// // // // //                   _TableCellHeader('النولون'),
+// // // // //                   _TableCellHeader('المبيت'),
+// // // // //                   _TableCellHeader('العطلة'),
+// // // // //                   _TableCellHeader('الإجراءات'),
+// // // // //                 ],
+// // // // //               ),
+
+// // // // //               /// ✅ الصفوف - جدول العجل
+// // // // //               ...transportations.asMap().entries.map((entry) {
+// // // // //                 final index = entry.key;
+// // // // //                 final item = entry.value;
+// // // // //                 final transport = item.transportation;
+
+// // // // //                 return TableRow(
+// // // // //                   decoration: BoxDecoration(
+// // // // //                     color: index.isEven
+// // // // //                         ? Colors.white
+// // // // //                         : const Color(0xFFF8F9FA),
+// // // // //                   ),
+// // // // //                   children: [
+// // // // //                     _TableCellBody('${index + 1}'),
+// // // // //                     _TableCellBody(transport.loadingLocation),
+// // // // //                     _TableCellBody(transport.unloadingLocation),
+// // // // //                     _TableCellBody(transport.vehicleType),
+// // // // //                     _TableCellBody('${transport.wheelNolon} ج'),
+// // // // //                     _TableCellBody('${transport.wheelOvernight} ج'),
+// // // // //                     _TableCellBody('${transport.wheelHoliday} ج'),
+// // // // //                     _TableCellActions(
+// // // // //                       onEdit: () => _editTransportation(item, 'wheels'),
+// // // // //                       onDelete: () => _deleteTransportation(item),
+// // // // //                     ),
+// // // // //                   ],
+// // // // //                 );
+// // // // //               }),
+// // // // //             ],
+// // // // //           ),
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // دالة تعديل الرحلة
+// // // // //   void _editTransportation(TransportationWithOffer item, String viewType) {
+// // // // //     final transportation = item.transportation;
+// // // // //     final isCompaniesView = viewType == 'companies';
+
+// // // // //     final loadingLocationController = TextEditingController(
+// // // // //       text: transportation.loadingLocation,
+// // // // //     );
+// // // // //     final unloadingLocationController = TextEditingController(
+// // // // //       text: transportation.unloadingLocation,
+// // // // //     );
+// // // // //     final vehicleTypeController = TextEditingController(
+// // // // //       text: transportation.vehicleType,
+// // // // //     );
+// // // // //     final nolonController = TextEditingController(
+// // // // //       text: isCompaniesView
+// // // // //           ? transportation.nolon.toString()
+// // // // //           : transportation.wheelNolon.toString(),
+// // // // //     );
+// // // // //     final overnightController = TextEditingController(
+// // // // //       text: isCompaniesView
+// // // // //           ? transportation.companyOvernight.toString()
+// // // // //           : transportation.wheelOvernight.toString(),
+// // // // //     );
+// // // // //     final holidayController = TextEditingController(
+// // // // //       text: isCompaniesView
+// // // // //           ? transportation.companyHoliday.toString()
+// // // // //           : transportation.wheelHoliday.toString(),
+// // // // //     );
+// // // // //     final notesController = TextEditingController(
+// // // // //       text: transportation.notes ?? '',
+// // // // //     );
+
+// // // // //     showDialog(
+// // // // //       context: context,
+// // // // //       builder: (context) => Directionality(
+// // // // //         textDirection: t.TextDirection.rtl,
+// // // // //         child: Dialog(
+// // // // //           backgroundColor: Colors.white,
+// // // // //           shape: RoundedRectangleBorder(
+// // // // //             borderRadius: BorderRadius.circular(16),
+// // // // //           ),
+// // // // //           child: SingleChildScrollView(
+// // // // //             child: Container(
+// // // // //               padding: const EdgeInsets.all(24),
+// // // // //               width: MediaQuery.of(context).size.width * 0.9,
+// // // // //               child: Column(
+// // // // //                 mainAxisSize: MainAxisSize.min,
+// // // // //                 crossAxisAlignment: CrossAxisAlignment.start,
+// // // // //                 children: [
+// // // // //                   // العنوان
+// // // // //                   Row(
+// // // // //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// // // // //                     children: [
+// // // // //                       Text(
+// // // // //                         'تعديل الرحلة - ${isCompaniesView ? 'الشركات' : 'العجل'}',
+// // // // //                         style: const TextStyle(
+// // // // //                           fontSize: 20,
+// // // // //                           fontWeight: FontWeight.bold,
+// // // // //                           color: Color(0xFF2C3E50),
+// // // // //                         ),
+// // // // //                       ),
+// // // // //                       IconButton(
+// // // // //                         icon: const Icon(Icons.close),
+// // // // //                         onPressed: () => Navigator.pop(context),
+// // // // //                       ),
+// // // // //                     ],
+// // // // //                   ),
+
+// // // // //                   const SizedBox(height: 8),
+// // // // //                   Divider(color: const Color(0xFF3498DB).withOpacity(0.3)),
+
+// // // // //                   const SizedBox(height: 20),
+
+// // // // //                   // حقل مكان التحميل
+// // // // //                   _buildEditField(
+// // // // //                     'مكان التحميل',
+// // // // //                     'أدخل مكان التحميل',
+// // // // //                     loadingLocationController,
+// // // // //                     Icons.location_on,
+// // // // //                   ),
+
+// // // // //                   const SizedBox(height: 16),
+
+// // // // //                   // حقل مكان التعتيق
+// // // // //                   _buildEditField(
+// // // // //                     'مكان التعتيق',
+// // // // //                     'أدخل مكان التعتيق',
+// // // // //                     unloadingLocationController,
+// // // // //                     Icons.location_on,
+// // // // //                   ),
+
+// // // // //                   const SizedBox(height: 16),
+
+// // // // //                   // حقل نوع العربية
+// // // // //                   _buildEditField(
+// // // // //                     'نوع العربية',
+// // // // //                     'أدخل نوع العربية',
+// // // // //                     vehicleTypeController,
+// // // // //                     Icons.directions_car,
+// // // // //                   ),
+
+// // // // //                   const SizedBox(height: 16),
+
+// // // // //                   // حقل النولون
+// // // // //                   _buildEditField(
+// // // // //                     'النولون',
+// // // // //                     'أدخل النولون',
+// // // // //                     nolonController,
+// // // // //                     Icons.attach_money,
+// // // // //                     keyboardType: TextInputType.number,
+// // // // //                   ),
+
+// // // // //                   const SizedBox(height: 16),
+
+// // // // //                   // حقل المبيت
+// // // // //                   _buildEditField(
+// // // // //                     'المبيت',
+// // // // //                     'أدخل المبيت',
+// // // // //                     overnightController,
+// // // // //                     Icons.hotel,
+// // // // //                     keyboardType: TextInputType.number,
+// // // // //                   ),
+
+// // // // //                   const SizedBox(height: 16),
+
+// // // // //                   // حقل العطلة
+// // // // //                   _buildEditField(
+// // // // //                     'العطلة',
+// // // // //                     'أدخل العطلة',
+// // // // //                     holidayController,
+// // // // //                     Icons.beach_access,
+// // // // //                     keyboardType: TextInputType.number,
+// // // // //                   ),
+
+// // // // //                   const SizedBox(height: 16),
+
+// // // // //                   // حقل الملاحظات
+// // // // //                   _buildEditField(
+// // // // //                     'ملاحظات',
+// // // // //                     'أدخل الملاحظات (اختياري)',
+// // // // //                     notesController,
+// // // // //                     Icons.note,
+// // // // //                     maxLines: 3,
+// // // // //                   ),
+
+// // // // //                   const SizedBox(height: 24),
+
+// // // // //                   // أزرار الحفظ والإلغاء
+// // // // //                   Row(
+// // // // //                     children: [
+// // // // //                       Expanded(
+// // // // //                         child: OutlinedButton(
+// // // // //                           onPressed: () => Navigator.pop(context),
+// // // // //                           style: OutlinedButton.styleFrom(
+// // // // //                             padding: const EdgeInsets.symmetric(vertical: 12),
+// // // // //                             shape: RoundedRectangleBorder(
+// // // // //                               borderRadius: BorderRadius.circular(8),
+// // // // //                             ),
+// // // // //                           ),
+// // // // //                           child: const Text(
+// // // // //                             'إلغاء',
+// // // // //                             style: TextStyle(
+// // // // //                               color: Color(0xFF2C3E50),
+// // // // //                               fontWeight: FontWeight.bold,
+// // // // //                             ),
+// // // // //                           ),
+// // // // //                         ),
+// // // // //                       ),
+// // // // //                       const SizedBox(width: 12),
+// // // // //                       Expanded(
+// // // // //                         child: ElevatedButton(
+// // // // //                           onPressed: () {
+// // // // //                             _updateTransportation(
+// // // // //                               item,
+// // // // //                               loadingLocationController.text,
+// // // // //                               unloadingLocationController.text,
+// // // // //                               vehicleTypeController.text,
+// // // // //                               nolonController.text,
+// // // // //                               overnightController.text,
+// // // // //                               holidayController.text,
+// // // // //                               notesController.text,
+// // // // //                               isCompaniesView,
+// // // // //                             );
+// // // // //                             Navigator.pop(context);
+// // // // //                           },
+// // // // //                           style: ElevatedButton.styleFrom(
+// // // // //                             backgroundColor: const Color(0xFF3498DB),
+// // // // //                             foregroundColor: Colors.white,
+// // // // //                             padding: const EdgeInsets.symmetric(vertical: 12),
+// // // // //                             shape: RoundedRectangleBorder(
+// // // // //                               borderRadius: BorderRadius.circular(8),
+// // // // //                             ),
+// // // // //                           ),
+// // // // //                           child: const Text(
+// // // // //                             'حفظ التعديلات',
+// // // // //                             style: TextStyle(fontWeight: FontWeight.bold),
+// // // // //                           ),
+// // // // //                         ),
+// // // // //                       ),
+// // // // //                     ],
+// // // // //                   ),
+// // // // //                 ],
+// // // // //               ),
+// // // // //             ),
+// // // // //           ),
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   Widget _buildEditField(
+// // // // //     String label,
+// // // // //     String hint,
+// // // // //     TextEditingController controller,
+// // // // //     IconData icon, {
+// // // // //     TextInputType keyboardType = TextInputType.text,
+// // // // //     int maxLines = 1,
+// // // // //   }) {
+// // // // //     return Column(
+// // // // //       crossAxisAlignment: CrossAxisAlignment.start,
+// // // // //       children: [
+// // // // //         Text(
+// // // // //           label,
+// // // // //           style: const TextStyle(
+// // // // //             fontWeight: FontWeight.bold,
+// // // // //             color: Color(0xFF2C3E50),
+// // // // //             fontSize: 14,
+// // // // //           ),
+// // // // //         ),
+// // // // //         const SizedBox(height: 6),
+// // // // //         TextFormField(
+// // // // //           controller: controller,
+// // // // //           keyboardType: keyboardType,
+// // // // //           maxLines: maxLines,
+// // // // //           decoration: InputDecoration(
+// // // // //             hintText: hint,
+// // // // //             prefixIcon: Icon(icon, color: const Color(0xFF3498DB)),
+// // // // //             filled: true,
+// // // // //             fillColor: const Color(0xFFF4F6F8),
+// // // // //             border: OutlineInputBorder(
+// // // // //               borderRadius: BorderRadius.circular(8),
+// // // // //               borderSide: BorderSide.none,
+// // // // //             ),
+// // // // //             contentPadding: const EdgeInsets.symmetric(
+// // // // //               horizontal: 16,
+// // // // //               vertical: 12,
+// // // // //             ),
+// // // // //           ),
+// // // // //         ),
+// // // // //       ],
+// // // // //     );
+// // // // //   }
+
+// // // // //   // دالة تحديث الرحلة في Firebase
+// // // // //   Future<void> _updateTransportation(
+// // // // //     TransportationWithOffer item,
+// // // // //     String loadingLocation,
+// // // // //     String unloadingLocation,
+// // // // //     String vehicleType,
+// // // // //     String nolon,
+// // // // //     String overnight,
+// // // // //     String holiday,
+// // // // //     String notes,
+// // // // //     bool isCompaniesView,
+// // // // //   ) async {
+// // // // //     try {
+// // // // //       final offerRef = _firestore
+// // // // //           .collection('companies')
+// // // // //           .doc(item.companyId)
+// // // // //           .collection('priceOffers')
+// // // // //           .doc(item.offerId);
+
+// // // // //       // جلب العرض الحالي
+// // // // //       final offerDoc = await offerRef.get();
+// // // // //       final offerData = offerDoc.data() as Map<String, dynamic>;
+// // // // //       final List<dynamic> transportations = offerData['transportations'];
+
+// // // // //       // تحديث الرحلة المحددة
+// // // // //       final updatedTransportations = transportations.map((transport) {
+// // // // //         final map = transport as Map<String, dynamic>;
+// // // // //         if (map['loadingLocation'] == item.transportation.loadingLocation &&
+// // // // //             map['unloadingLocation'] == item.transportation.unloadingLocation &&
+// // // // //             map['vehicleType'] == item.transportation.vehicleType) {
+// // // // //           final updatedMap = {
+// // // // //             ...map,
+// // // // //             'loadingLocation': loadingLocation.trim(),
+// // // // //             'unloadingLocation': unloadingLocation.trim(),
+// // // // //             'vehicleType': vehicleType.trim(),
+// // // // //             'notes': notes.trim().isEmpty ? null : notes.trim(),
+// // // // //           };
+
+// // // // //           // تحديث الحقول حسب النوع
+// // // // //           if (isCompaniesView) {
+// // // // //             updatedMap['nolon'] =
+// // // // //                 double.tryParse(nolon) ?? item.transportation.nolon;
+// // // // //             updatedMap['companyOvernight'] =
+// // // // //                 double.tryParse(overnight) ??
+// // // // //                 item.transportation.companyOvernight;
+// // // // //             updatedMap['companyHoliday'] =
+// // // // //                 double.tryParse(holiday) ?? item.transportation.companyHoliday;
+// // // // //           } else {
+// // // // //             updatedMap['wheelNolon'] =
+// // // // //                 double.tryParse(nolon) ?? item.transportation.wheelNolon;
+// // // // //             updatedMap['wheelOvernight'] =
+// // // // //                 double.tryParse(overnight) ??
+// // // // //                 item.transportation.wheelOvernight;
+// // // // //             updatedMap['wheelHoliday'] =
+// // // // //                 double.tryParse(holiday) ?? item.transportation.wheelHoliday;
+// // // // //           }
+
+// // // // //           return updatedMap;
+// // // // //         }
+// // // // //         return transport;
+// // // // //       }).toList();
+
+// // // // //       // تحديث العرض في Firebase
+// // // // //       await offerRef.update({
+// // // // //         'transportations': updatedTransportations,
+// // // // //         'updatedAt': Timestamp.now(),
+// // // // //       });
+
+// // // // //       // إظهار رسالة نجاح
+// // // // //       if (mounted) {
+// // // // //         ScaffoldMessenger.of(context).showSnackBar(
+// // // // //           const SnackBar(
+// // // // //             content: Text('تم تعديل الرحلة بنجاح'),
+// // // // //             backgroundColor: Colors.green,
+// // // // //             duration: Duration(seconds: 2),
+// // // // //           ),
+// // // // //         );
+// // // // //       }
+// // // // //     } catch (e) {
+// // // // //       print('Error updating transportation: $e');
+// // // // //       if (mounted) {
+// // // // //         ScaffoldMessenger.of(context).showSnackBar(
+// // // // //           SnackBar(
+// // // // //             content: Text('خطأ في التعديل: $e'),
+// // // // //             backgroundColor: Colors.red,
+// // // // //             duration: const Duration(seconds: 3),
+// // // // //           ),
+// // // // //         );
+// // // // //       }
+// // // // //     }
+// // // // //   }
+
+// // // // //   // دالة حذف الرحلة
+// // // // //   void _deleteTransportation(TransportationWithOffer item) {
+// // // // //     showDialog(
+// // // // //       context: context,
+// // // // //       builder: (context) => Directionality(
+// // // // //         textDirection: t.TextDirection.rtl,
+// // // // //         child: AlertDialog(
+// // // // //           backgroundColor: Colors.white,
+// // // // //           shape: RoundedRectangleBorder(
+// // // // //             borderRadius: BorderRadius.circular(16),
+// // // // //           ),
+// // // // //           title: const Row(
+// // // // //             children: [
+// // // // //               Icon(Icons.warning, color: Colors.orange),
+// // // // //               SizedBox(width: 8),
+// // // // //               Text(
+// // // // //                 'تأكيد الحذف',
+// // // // //                 style: TextStyle(
+// // // // //                   fontWeight: FontWeight.bold,
+// // // // //                   color: Color(0xFF2C3E50),
+// // // // //                 ),
+// // // // //               ),
+// // // // //             ],
+// // // // //           ),
+// // // // //           content: Column(
+// // // // //             mainAxisSize: MainAxisSize.min,
+// // // // //             crossAxisAlignment: CrossAxisAlignment.start,
+// // // // //             children: [
+// // // // //               const Text(
+// // // // //                 'هل أنت متأكد من حذف هذه الرحلة؟',
+// // // // //                 style: TextStyle(fontSize: 16),
+// // // // //               ),
+// // // // //               const SizedBox(height: 8),
+// // // // //               Text(
+// // // // //                 'المسار: ${item.transportation.loadingLocation} → ${item.transportation.unloadingLocation}',
+// // // // //                 style: const TextStyle(color: Colors.grey),
+// // // // //               ),
+// // // // //               Text(
+// // // // //                 'النولون: ${item.transportation.nolon} ج',
+// // // // //                 style: const TextStyle(color: Colors.grey),
+// // // // //               ),
+// // // // //               const SizedBox(height: 16),
+// // // // //               const Text(
+// // // // //                 '⚠️ لا يمكن التراجع عن هذا الإجراء',
+// // // // //                 style: TextStyle(
+// // // // //                   color: Colors.red,
+// // // // //                   fontSize: 12,
+// // // // //                   fontWeight: FontWeight.bold,
+// // // // //                 ),
+// // // // //               ),
+// // // // //             ],
+// // // // //           ),
+// // // // //           actions: [
+// // // // //             TextButton(
+// // // // //               onPressed: () => Navigator.pop(context),
+// // // // //               child: const Text(
+// // // // //                 'إلغاء',
+// // // // //                 style: TextStyle(color: Color(0xFF2C3E50)),
+// // // // //               ),
+// // // // //             ),
+// // // // //             ElevatedButton(
+// // // // //               onPressed: () {
+// // // // //                 _confirmDeleteTransportation(item);
+// // // // //                 Navigator.pop(context);
+// // // // //               },
+// // // // //               style: ElevatedButton.styleFrom(
+// // // // //                 backgroundColor: Colors.red,
+// // // // //                 foregroundColor: Colors.white,
+// // // // //               ),
+// // // // //               child: const Text('حذف'),
+// // // // //             ),
+// // // // //           ],
+// // // // //         ),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   // دالة تأكيد الحذف
+// // // // //   Future<void> _confirmDeleteTransportation(
+// // // // //     TransportationWithOffer item,
+// // // // //   ) async {
+// // // // //     try {
+// // // // //       final offerRef = _firestore
+// // // // //           .collection('companies')
+// // // // //           .doc(item.companyId)
+// // // // //           .collection('priceOffers')
+// // // // //           .doc(item.offerId);
+
+// // // // //       // جلب العرض الحالي
+// // // // //       final offerDoc = await offerRef.get();
+// // // // //       final offerData = offerDoc.data() as Map<String, dynamic>;
+// // // // //       final List<dynamic> transportations = offerData['transportations'];
+
+// // // // //       // تصفية الرحلة المطلوب حذفها
+// // // // //       final updatedTransportations = transportations.where((transport) {
+// // // // //         final map = transport as Map<String, dynamic>;
+// // // // //         return !(map['loadingLocation'] ==
+// // // // //                 item.transportation.loadingLocation &&
+// // // // //             map['unloadingLocation'] == item.transportation.unloadingLocation &&
+// // // // //             map['vehicleType'] == item.transportation.vehicleType);
+// // // // //       }).toList();
+
+// // // // //       // إذا لم يتبقى أي رحلات، احذف العرض كاملاً
+// // // // //       if (updatedTransportations.isEmpty) {
+// // // // //         await offerRef.delete();
+// // // // //       } else {
+// // // // //         // وإلا قم بتحديث العرض
+// // // // //         await offerRef.update({
+// // // // //           'transportations': updatedTransportations,
+// // // // //           'updatedAt': Timestamp.now(),
+// // // // //         });
+// // // // //       }
+
+// // // // //       // إظهار رسالة نجاح
+// // // // //       if (mounted) {
+// // // // //         ScaffoldMessenger.of(context).showSnackBar(
+// // // // //           const SnackBar(
+// // // // //             content: Text('تم حذف الرحلة بنجاح'),
+// // // // //             backgroundColor: Colors.green,
+// // // // //             duration: Duration(seconds: 2),
+// // // // //           ),
+// // // // //         );
+// // // // //       }
+// // // // //     } catch (e) {
+// // // // //       print('Error deleting transportation: $e');
+// // // // //       if (mounted) {
+// // // // //         ScaffoldMessenger.of(context).showSnackBar(
+// // // // //           SnackBar(
+// // // // //             content: Text('خطأ في الحذف: $e'),
+// // // // //             backgroundColor: Colors.red,
+// // // // //             duration: const Duration(seconds: 3),
+// // // // //           ),
+// // // // //         );
+// // // // //       }
+// // // // //     }
+// // // // //   }
+
+// // // // //   Widget _buildActionButton({
+// // // // //     required IconData icon,
+// // // // //     required String label,
+// // // // //     required Color color,
+// // // // //     required VoidCallback onPressed,
+// // // // //   }) {
+// // // // //     return ElevatedButton.icon(
+// // // // //       onPressed: onPressed,
+// // // // //       icon: Icon(icon, size: 18),
+// // // // //       label: Text(label),
+// // // // //       style: ElevatedButton.styleFrom(
+// // // // //         backgroundColor: color.withOpacity(0.9),
+// // // // //         foregroundColor: Colors.white,
+// // // // //         elevation: 0,
+// // // // //         padding: const EdgeInsets.symmetric(vertical: 10),
+// // // // //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+
+// // // // //   String _formatDate(DateTime date) {
+// // // // //     return '${date.day}/${date.month}/${date.year}';
+// // // // //   }
+// // // // // }
+
+// // // // // // نموذج مساعد لتخزين معلومات الرحلة مع معلومات العرض
+// // // // // class TransportationWithOffer {
+// // // // //   final Transportation transportation;
+// // // // //   final offerId;
+// // // // //   final String companyId;
+// // // // //   final PriceOffer offer;
+
+// // // // //   TransportationWithOffer({
+// // // // //     required this.transportation,
+// // // // //     required this.offerId,
+// // // // //     required this.companyId,
+// // // // //     required this.offer,
+// // // // //   });
+// // // // // }
+
+// // // // // class _TableCellBody extends StatelessWidget {
+// // // // //   final String text;
+// // // // //   final TextStyle? textStyle;
+
+// // // // //   const _TableCellBody(this.text, {this.textStyle});
+
+// // // // //   @override
+// // // // //   Widget build(BuildContext context) {
+// // // // //     return Container(
+// // // // //       height: 48,
+// // // // //       alignment: Alignment.center,
+// // // // //       padding: const EdgeInsets.symmetric(horizontal: 8),
+// // // // //       child: Text(
+// // // // //         text,
+// // // // //         maxLines: 2,
+// // // // //         overflow: TextOverflow.ellipsis,
+// // // // //         textAlign: TextAlign.center,
+// // // // //         style: textStyle,
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+// // // // // }
+
+// // // // // class _TableCellHeader extends StatelessWidget {
+// // // // //   final String text;
+// // // // //   const _TableCellHeader(this.text);
+
+// // // // //   @override
+// // // // //   Widget build(BuildContext context) {
+// // // // //     return Container(
+// // // // //       height: 50,
+// // // // //       alignment: Alignment.center,
+// // // // //       padding: const EdgeInsets.symmetric(horizontal: 8),
+// // // // //       child: Text(
+// // // // //         text,
+// // // // //         style: const TextStyle(
+// // // // //           fontWeight: FontWeight.bold,
+// // // // //           fontSize: 14,
+// // // // //           color: Color(0xFF2C3E50),
+// // // // //         ),
+// // // // //         textAlign: TextAlign.center,
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+// // // // // }
+
+// // // // // class _TableCellActions extends StatelessWidget {
+// // // // //   final VoidCallback onEdit;
+// // // // //   final VoidCallback onDelete;
+
+// // // // //   const _TableCellActions({required this.onEdit, required this.onDelete});
+
+// // // // //   @override
+// // // // //   Widget build(BuildContext context) {
+// // // // //     return Container(
+// // // // //       height: 48,
+// // // // //       alignment: Alignment.center,
+// // // // //       padding: const EdgeInsets.symmetric(horizontal: 4),
+// // // // //       child: Row(
+// // // // //         mainAxisAlignment: MainAxisAlignment.center,
+// // // // //         children: [
+// // // // //           // زر التعديل
+// // // // //           IconButton(
+// // // // //             icon: Container(
+// // // // //               padding: const EdgeInsets.all(6),
+// // // // //               decoration: BoxDecoration(
+// // // // //                 color: Colors.blue.withOpacity(0.1),
+// // // // //                 borderRadius: BorderRadius.circular(6),
+// // // // //               ),
+// // // // //               child: const Icon(Icons.edit, size: 16, color: Colors.blue),
+// // // // //             ),
+// // // // //             onPressed: onEdit,
+// // // // //             padding: EdgeInsets.zero,
+// // // // //             constraints: const BoxConstraints(),
+// // // // //           ),
+// // // // //           const SizedBox(width: 4),
+// // // // //           // زر الحذف
+// // // // //           IconButton(
+// // // // //             icon: Container(
+// // // // //               padding: const EdgeInsets.all(6),
+// // // // //               decoration: BoxDecoration(
+// // // // //                 color: Colors.red.withOpacity(0.1),
+// // // // //                 borderRadius: BorderRadius.circular(6),
+// // // // //               ),
+// // // // //               child: const Icon(Icons.delete, size: 16, color: Colors.red),
+// // // // //             ),
+// // // // //             onPressed: onDelete,
+// // // // //             padding: EdgeInsets.zero,
+// // // // //             constraints: const BoxConstraints(),
+// // // // //           ),
+// // // // //         ],
+// // // // //       ),
+// // // // //     );
+// // // // //   }
+// // // // // }
+// // // // import 'package:cloud_firestore/cloud_firestore.dart';
+// // // // import 'package:flutter/material.dart';
+// // // // import 'package:last/models/models.dart';
+// // // // import 'package:printing/printing.dart';
+// // // // import 'package:pdf/pdf.dart';
+// // // // import 'package:pdf/widgets.dart' as pdfLib;
+// // // // import 'package:intl/intl.dart';
+// // // // import 'package:flutter/services.dart';
+// // // // import 'package:flutter/widgets.dart' as t;
+
+// // // // class PriceOffersListScreen extends StatefulWidget {
+// // // //   const PriceOffersListScreen({super.key});
+
+// // // //   @override
+// // // //   State<PriceOffersListScreen> createState() => _PriceOffersListScreenState();
+// // // // }
+
+// // // // class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
+// // // //   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+// // // //   String _searchQuery = '';
+// // // //   String _activeView = 'companies'; // 'companies' أو 'wheels'
+// // // //   pdfLib.Font? _arabicFont;
+// // // //   bool _isGeneratingPDF = false;
+// // // //   String? _currentCompanyName;
+// // // //   String? _currentViewType;
+// // // //   String? _currentCompanyId;
+// // // //   List<TransportationWithOffer>? _currentTransportations;
+
+// // // //   // إضافة ScrollController لإصلاح مشكلة التهنيج
+// // // //   final ScrollController _scrollController = ScrollController();
+
+// // // //   @override
+// // // //   void initState() {
+// // // //     super.initState();
+// // // //     _loadArabicFont();
+// // // //   }
+
+// // // //   @override
+// // // //   void dispose() {
+// // // //     _scrollController.dispose();
+// // // //     super.dispose();
+// // // //   }
+
+// // // //   Future<void> _loadArabicFont() async {
+// // // //     try {
+// // // //       final fontData = await rootBundle.load(
+// // // //         'assets/fonts/Amiri/Amiri-Regular.ttf',
+// // // //       );
+
+// // // //       _arabicFont = pdfLib.Font.ttf(fontData);
+// // // //       debugPrint('تم تحميل الخط العربي بنجاح');
+// // // //     } catch (e) {
+// // // //       debugPrint('فشل تحميل الخط العربي: $e');
+// // // //     }
+// // // //   }
+
+// // // //   @override
+// // // //   Widget build(BuildContext context) {
+// // // //     return Scaffold(
+// // // //       backgroundColor: const Color(0xFFF4F6F8),
+// // // //       body: SingleChildScrollView(
+// // // //         controller: _scrollController, // إضافة الـ Controller
+// // // //         child: Column(
+// // // //           children: [
+// // // //             _buildSearchAndStatsBar(),
+// // // //             Padding(
+// // // //               padding: const EdgeInsets.only(top: 8),
+// // // //               child: SizedBox(
+// // // //                 height: MediaQuery.of(context).size.height * 0.75,
+// // // //                 child: _buildCompaniesWithOffersList(),
+// // // //               ),
+// // // //             ),
+// // // //           ],
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   Widget _buildSearchAndStatsBar() {
+// // // //     return Container(
+// // // //       color: Colors.white,
+// // // //       padding: const EdgeInsets.all(16),
+// // // //       child: Column(
+// // // //         children: [
+// // // //           // شريط البحث
+// // // //           Container(
+// // // //             padding: const EdgeInsets.symmetric(horizontal: 16),
+// // // //             decoration: BoxDecoration(
+// // // //               color: const Color(0xFFF4F6F8),
+// // // //               borderRadius: BorderRadius.circular(12),
+// // // //               border: Border.all(color: const Color(0xFF3498DB), width: 1.5),
+// // // //             ),
+// // // //             child: Row(
+// // // //               children: [
+// // // //                 const Icon(Icons.search, color: Color(0xFF3498DB), size: 22),
+// // // //                 const SizedBox(width: 12),
+// // // //                 Expanded(
+// // // //                   child: TextField(
+// // // //                     onChanged: (value) => setState(() => _searchQuery = value),
+// // // //                     decoration: const InputDecoration(
+// // // //                       hintText: 'ابحث عن شركة...',
+// // // //                       border: InputBorder.none,
+// // // //                       hintStyle: TextStyle(color: Colors.grey),
+// // // //                       contentPadding: EdgeInsets.symmetric(vertical: 12),
+// // // //                     ),
+// // // //                   ),
+// // // //                 ),
+// // // //                 if (_searchQuery.isNotEmpty)
+// // // //                   GestureDetector(
+// // // //                     onTap: () => setState(() => _searchQuery = ''),
+// // // //                     child: const Icon(
+// // // //                       Icons.clear,
+// // // //                       size: 20,
+// // // //                       color: Colors.grey,
+// // // //                     ),
+// // // //                   ),
+// // // //               ],
+// // // //             ),
+// // // //           ),
+
+// // // //           const SizedBox(height: 12),
+
+// // // //           // الإحصائيات
+// // // //           _buildStatsBar(),
+// // // //         ],
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   Widget _buildStatsBar() {
+// // // //     return StreamBuilder<QuerySnapshot>(
+// // // //       stream: _firestore.collectionGroup('priceOffers').snapshots(),
+// // // //       builder: (context, snapshot) {
+// // // //         if (!snapshot.hasData) {
+// // // //           return const SizedBox();
+// // // //         }
+
+// // // //         int totalCompanies = 0;
+// // // //         int totalOffers = 0;
+// // // //         int totalTrips = 0;
+
+// // // //         // حساب الإحصائيات من البيانات الحالية
+// // // //         final companiesData = _extractCompaniesData(snapshot.data!);
+// // // //         totalCompanies = companiesData.length;
+
+// // // //         for (final company in companiesData) {
+// // // //           totalOffers += (company['totalOffers'] as num).toInt();
+// // // //           totalTrips += (company['totalTrips'] as num).toInt();
+// // // //         }
+// // // //         return Row(
+// // // //           children: [
+// // // //             _buildStatCard('شركات', totalCompanies.toString(), Icons.business),
+// // // //             const SizedBox(width: 12),
+// // // //             _buildStatCard('عروض', totalTrips.toString(), Icons.description),
+// // // //             const SizedBox(width: 12),
+// // // //           ],
+// // // //         );
+// // // //       },
+// // // //     );
+// // // //   }
+
+// // // //   List<Map<String, dynamic>> _extractCompaniesData(QuerySnapshot snapshot) {
+// // // //     final Map<String, Map<String, dynamic>> companiesMap = {};
+
+// // // //     for (final doc in snapshot.docs) {
+// // // //       final data = doc.data() as Map<String, dynamic>;
+// // // //       final companyId = _extractCompanyIdFromPath(doc.reference.path);
+// // // //       final companyName = data['companyName'] ?? 'غير معروف';
+
+// // // //       if (!companiesMap.containsKey(companyId)) {
+// // // //         companiesMap[companyId] = {
+// // // //           'companyId': companyId,
+// // // //           'companyName': companyName,
+// // // //           'totalOffers': 0,
+// // // //           'totalTrips': 0,
+// // // //         };
+// // // //       }
+
+// // // //       companiesMap[companyId]!['totalOffers']++;
+// // // //       final transports = data['transportations'] as List? ?? [];
+// // // //       companiesMap[companyId]!['totalTrips'] += transports.length;
+// // // //     }
+
+// // // //     return companiesMap.values.toList();
+// // // //   }
+
+// // // //   String _extractCompanyIdFromPath(String path) {
+// // // //     final parts = path.split('/');
+// // // //     return parts[1]; // companies/{companyId}/priceOffers/{offerId}
+// // // //   }
+
+// // // //   Widget _buildStatCard(String label, String value, IconData icon) {
+// // // //     return Expanded(
+// // // //       child: Container(
+// // // //         padding: const EdgeInsets.all(12),
+// // // //         decoration: BoxDecoration(
+// // // //           color: const Color(0xFF3498DB).withOpacity(0.1),
+// // // //           borderRadius: BorderRadius.circular(10),
+// // // //           border: Border.all(color: const Color(0xFF3498DB), width: 1),
+// // // //         ),
+// // // //         child: Row(
+// // // //           children: [
+// // // //             Icon(icon, color: const Color(0xFF3498DB), size: 24),
+// // // //             const SizedBox(width: 8),
+// // // //             Expanded(
+// // // //               child: Column(
+// // // //                 crossAxisAlignment: CrossAxisAlignment.start,
+// // // //                 children: [
+// // // //                   Text(
+// // // //                     label,
+// // // //                     style: const TextStyle(
+// // // //                       fontSize: 12,
+// // // //                       color: Colors.grey,
+// // // //                       fontWeight: FontWeight.w500,
+// // // //                     ),
+// // // //                   ),
+// // // //                   Text(
+// // // //                     value,
+// // // //                     style: const TextStyle(
+// // // //                       fontSize: 18,
+// // // //                       fontWeight: FontWeight.bold,
+// // // //                       color: Color(0xFF2C3E50),
+// // // //                     ),
+// // // //                   ),
+// // // //                 ],
+// // // //               ),
+// // // //             ),
+// // // //           ],
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   Widget _buildCompaniesWithOffersList() {
+// // // //     return StreamBuilder<QuerySnapshot>(
+// // // //       stream: _firestore.collectionGroup('priceOffers').snapshots(),
+// // // //       builder: (context, snapshot) {
+// // // //         if (snapshot.hasError) {
+// // // //           return Center(
+// // // //             child: Column(
+// // // //               mainAxisAlignment: MainAxisAlignment.center,
+// // // //               children: [
+// // // //                 const Icon(Icons.error, size: 64, color: Colors.red),
+// // // //                 const SizedBox(height: 16),
+// // // //                 Text('خطأ: ${snapshot.error}', textAlign: TextAlign.center),
+// // // //               ],
+// // // //             ),
+// // // //           );
+// // // //         }
+
+// // // //         if (snapshot.connectionState == ConnectionState.waiting) {
+// // // //           return const Center(child: CircularProgressIndicator());
+// // // //         }
+
+// // // //         final companiesWithOffers = _extractCompaniesData(snapshot.data!);
+
+// // // //         final filteredCompanies = companiesWithOffers.where((company) {
+// // // //           if (_searchQuery.isEmpty) return true;
+// // // //           final companyName =
+// // // //               company['companyName']?.toString().toLowerCase() ?? '';
+// // // //           return companyName.contains(_searchQuery.toLowerCase());
+// // // //         }).toList();
+
+// // // //         if (filteredCompanies.isEmpty) {
+// // // //           return Center(
+// // // //             child: Column(
+// // // //               mainAxisAlignment: MainAxisAlignment.center,
+// // // //               children: [
+// // // //                 const Icon(Icons.business, size: 80, color: Colors.grey),
+// // // //                 const SizedBox(height: 16),
+// // // //                 const Text(
+// // // //                   'لا توجد شركات لديها عروض أسعار',
+// // // //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+// // // //                 ),
+// // // //                 const SizedBox(height: 8),
+// // // //                 Text(
+// // // //                   _searchQuery.isEmpty
+// // // //                       ? 'أضف عرض سعر جديد للبدء'
+// // // //                       : 'لم يتم العثور على نتائج البحث',
+// // // //                   style: const TextStyle(color: Colors.grey, fontSize: 14),
+// // // //                 ),
+// // // //               ],
+// // // //             ),
+// // // //           );
+// // // //         }
+
+// // // //         return ListView.builder(
+// // // //           shrinkWrap: true,
+// // // //           physics: const ClampingScrollPhysics(), // تغيير الفيزياء لمنع التهنيج
+// // // //           padding: const EdgeInsets.all(16),
+// // // //           itemCount: filteredCompanies.length,
+// // // //           itemBuilder: (context, index) {
+// // // //             final companyData = filteredCompanies[index];
+// // // //             return _buildCompanyWithAllOffersItem(companyData);
+// // // //           },
+// // // //         );
+// // // //       },
+// // // //     );
+// // // //   }
+
+// // // //   Widget _buildCompanyWithAllOffersItem(Map<String, dynamic> companyData) {
+// // // //     final String companyName = companyData['companyName'];
+// // // //     final String companyId = companyData['companyId'];
+// // // //     final int totalOffers = companyData['totalOffers'];
+// // // //     final int totalTrips = companyData['totalTrips'];
+
+// // // //     return Container(
+// // // //       margin: const EdgeInsets.only(bottom: 12),
+// // // //       decoration: BoxDecoration(
+// // // //         color: Colors.white,
+// // // //         borderRadius: BorderRadius.circular(12),
+// // // //         border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3)),
+// // // //         boxShadow: [
+// // // //           BoxShadow(
+// // // //             color: Colors.black.withOpacity(0.05),
+// // // //             blurRadius: 8,
+// // // //             offset: const Offset(0, 2),
+// // // //           ),
+// // // //         ],
+// // // //       ),
+// // // //       child: ListTile(
+// // // //         leading: Container(
+// // // //           padding: const EdgeInsets.all(8),
+// // // //           decoration: BoxDecoration(
+// // // //             color: const Color(0xFF3498DB).withOpacity(0.1),
+// // // //             borderRadius: BorderRadius.circular(8),
+// // // //           ),
+// // // //           child: const Icon(Icons.business, color: Color(0xFF3498DB), size: 24),
+// // // //         ),
+// // // //         title: Text(
+// // // //           companyName,
+// // // //           style: const TextStyle(
+// // // //             fontSize: 16,
+// // // //             fontWeight: FontWeight.bold,
+// // // //             color: Color(0xFF2C3E50),
+// // // //           ),
+// // // //         ),
+// // // //         subtitle: Text(
+// // // //           '$totalTrips عروض السعر :',
+// // // //           style: const TextStyle(fontSize: 12, color: Colors.grey),
+// // // //         ),
+// // // //         trailing: Row(
+// // // //           mainAxisSize: MainAxisSize.min,
+// // // //           children: [
+// // // //             _buildActionButton(
+// // // //               icon: Icons.business,
+// // // //               label: 'الشركات',
+// // // //               color: Colors.blue,
+// // // //               onPressed: () {
+// // // //                 setState(() => _activeView = 'companies');
+// // // //                 _showAllCompanyOffers(companyId, companyName, 'companies');
+// // // //               },
+// // // //             ),
+// // // //             const SizedBox(width: 8),
+// // // //             _buildActionButton(
+// // // //               icon: Icons.directions_bus,
+// // // //               label: 'العجل',
+// // // //               color: Colors.purple,
+// // // //               onPressed: () {
+// // // //                 setState(() => _activeView = 'wheels');
+// // // //                 _showAllCompanyOffers(companyId, companyName, 'wheels');
+// // // //               },
+// // // //             ),
+// // // //           ],
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   void _showAllCompanyOffers(
+// // // //     String companyId,
+// // // //     String companyName,
+// // // //     String viewType,
+// // // //   ) {
+// // // //     _currentCompanyId = companyId;
+// // // //     _currentCompanyName = companyName;
+// // // //     _currentViewType = viewType;
+
+// // // //     showDialog(
+// // // //       context: context,
+// // // //       builder: (context) => Directionality(
+// // // //         textDirection: t.TextDirection.rtl,
+// // // //         child: Dialog(
+// // // //           backgroundColor: Colors.transparent,
+// // // //           insetPadding: const EdgeInsets.all(16),
+// // // //           child: Container(
+// // // //             width: MediaQuery.of(context).size.width * 0.95,
+// // // //             constraints: BoxConstraints(
+// // // //               maxHeight: MediaQuery.of(context).size.height * 0.9,
+// // // //             ),
+// // // //             padding: const EdgeInsets.all(20),
+// // // //             decoration: BoxDecoration(
+// // // //               color: Colors.white,
+// // // //               borderRadius: BorderRadius.circular(16),
+// // // //               boxShadow: [
+// // // //                 BoxShadow(
+// // // //                   color: Colors.black.withOpacity(0.15),
+// // // //                   blurRadius: 20,
+// // // //                 ),
+// // // //               ],
+// // // //             ),
+// // // //             child: Column(
+// // // //               mainAxisSize: MainAxisSize.min,
+// // // //               children: [
+// // // //                 // العنوان
+// // // //                 Row(
+// // // //                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// // // //                   children: [
+// // // //                     Row(
+// // // //                       mainAxisSize: MainAxisSize.min,
+// // // //                       children: [
+// // // //                         // زر الطباعة
+// // // //                         IconButton(
+// // // //                           icon: Icon(Icons.print, color: Colors.green[700]),
+// // // //                           onPressed: () => _generatePDF(),
+// // // //                         ),
+// // // //                         // زر الإغلاق
+// // // //                         IconButton(
+// // // //                           icon: const Icon(Icons.close),
+// // // //                           onPressed: () => Navigator.pop(context),
+// // // //                         ),
+// // // //                       ],
+// // // //                     ),
+// // // //                     Column(
+// // // //                       children: [
+// // // //                         Text(
+// // // //                           viewType == 'companies'
+// // // //                               ? 'عروض اسعار الشركات - $companyName'
+// // // //                               : 'عروض اسعار العجل - $companyName',
+// // // //                           style: const TextStyle(
+// // // //                             fontSize: 20,
+// // // //                             fontWeight: FontWeight.bold,
+// // // //                             color: Color(0xFF2C3E50),
+// // // //                           ),
+// // // //                         ),
+// // // //                         const SizedBox(height: 4),
+// // // //                       ],
+// // // //                     ),
+// // // //                     const SizedBox(width: 48),
+// // // //                   ],
+// // // //                 ),
+
+// // // //                 const SizedBox(height: 8),
+// // // //                 Divider(color: const Color(0xFF3498DB).withOpacity(0.3)),
+
+// // // //                 // إحصائيات الشركة
+// // // //                 Container(
+// // // //                   padding: const EdgeInsets.all(12),
+// // // //                   decoration: BoxDecoration(
+// // // //                     color: const Color(0xFF3498DB).withOpacity(0.1),
+// // // //                     borderRadius: BorderRadius.circular(10),
+// // // //                   ),
+// // // //                   child: Row(
+// // // //                     mainAxisAlignment: MainAxisAlignment.spaceAround,
+// // // //                     children: [
+// // // //                       Column(
+// // // //                         children: [
+// // // //                           const Text(
+// // // //                             'اسم الشركة',
+// // // //                             style: TextStyle(fontSize: 11, color: Colors.grey),
+// // // //                           ),
+// // // //                           Text(
+// // // //                             companyName,
+// // // //                             style: const TextStyle(
+// // // //                               fontSize: 16,
+// // // //                               fontWeight: FontWeight.bold,
+// // // //                               color: Color(0xFF2C3E50),
+// // // //                             ),
+// // // //                           ),
+// // // //                         ],
+// // // //                       ),
+// // // //                       Column(
+// // // //                         children: [
+// // // //                           const Text(
+// // // //                             'إجمالي العروض',
+// // // //                             style: TextStyle(fontSize: 11, color: Colors.grey),
+// // // //                           ),
+// // // //                           StreamBuilder<QuerySnapshot>(
+// // // //                             stream: _firestore
+// // // //                                 .collection('companies')
+// // // //                                 .doc(companyId)
+// // // //                                 .collection('priceOffers')
+// // // //                                 .snapshots(),
+// // // //                             builder: (context, snapshot) {
+// // // //                               int totalTrips = 0;
+// // // //                               if (snapshot.hasData) {
+// // // //                                 for (final doc in snapshot.data!.docs) {
+// // // //                                   final data =
+// // // //                                       doc.data() as Map<String, dynamic>;
+// // // //                                   final transports =
+// // // //                                       data['transportations'] as List? ?? [];
+// // // //                                   totalTrips += transports.length;
+// // // //                                 }
+// // // //                               }
+// // // //                               return Text(
+// // // //                                 '$totalTrips',
+// // // //                                 style: const TextStyle(
+// // // //                                   fontSize: 16,
+// // // //                                   fontWeight: FontWeight.bold,
+// // // //                                   color: Color(0xFF2C3E50),
+// // // //                                 ),
+// // // //                               );
+// // // //                             },
+// // // //                           ),
+// // // //                         ],
+// // // //                       ),
+// // // //                     ],
+// // // //                   ),
+// // // //                 ),
+
+// // // //                 const SizedBox(height: 16),
+
+// // // //                 // الجدول
+// // // //                 Expanded(child: _buildCompanyOffersTable(companyId, viewType)),
+
+// // // //                 const SizedBox(height: 16),
+
+// // // //                 // زر الإغلاق
+// // // //                 Row(
+// // // //                   mainAxisAlignment: MainAxisAlignment.center,
+// // // //                   children: [
+// // // //                     ElevatedButton(
+// // // //                       onPressed: () => _generatePDF(),
+// // // //                       style: ElevatedButton.styleFrom(
+// // // //                         backgroundColor: const Color.fromARGB(255, 255, 0, 0),
+// // // //                         foregroundColor: Colors.white,
+// // // //                         elevation: 2,
+// // // //                         padding: const EdgeInsets.symmetric(
+// // // //                           horizontal: 40,
+// // // //                           vertical: 12,
+// // // //                         ),
+// // // //                         shape: RoundedRectangleBorder(
+// // // //                           borderRadius: BorderRadius.circular(8),
+// // // //                         ),
+// // // //                       ),
+// // // //                       child: Row(
+// // // //                         children: [
+// // // //                           Icon(
+// // // //                             Icons.print,
+// // // //                             color: const Color.fromARGB(255, 255, 255, 255),
+// // // //                           ),
+// // // //                         ],
+// // // //                       ),
+// // // //                     ),
+// // // //                     const SizedBox(width: 10),
+// // // //                     ElevatedButton(
+// // // //                       onPressed: () => Navigator.pop(context),
+// // // //                       style: ElevatedButton.styleFrom(
+// // // //                         backgroundColor: const Color(0xFF3498DB),
+// // // //                         foregroundColor: Colors.white,
+// // // //                         elevation: 2,
+// // // //                         padding: const EdgeInsets.symmetric(
+// // // //                           horizontal: 40,
+// // // //                           vertical: 12,
+// // // //                         ),
+// // // //                         shape: RoundedRectangleBorder(
+// // // //                           borderRadius: BorderRadius.circular(8),
+// // // //                         ),
+// // // //                       ),
+// // // //                       child: const Text('إغلاق'),
+// // // //                     ),
+// // // //                   ],
+// // // //                 ),
+// // // //               ],
+// // // //             ),
+// // // //           ),
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   Widget _buildCompanyOffersTable(String companyId, String viewType) {
+// // // //     return StreamBuilder<QuerySnapshot>(
+// // // //       stream: _firestore
+// // // //           .collection('companies')
+// // // //           .doc(companyId)
+// // // //           .collection('priceOffers')
+// // // //           .orderBy('updatedAt', descending: true)
+// // // //           .snapshots(),
+// // // //       builder: (context, snapshot) {
+// // // //         if (snapshot.connectionState == ConnectionState.waiting) {
+// // // //           return const Center(child: CircularProgressIndicator());
+// // // //         }
+
+// // // //         if (snapshot.hasError) {
+// // // //           return Center(
+// // // //             child: Column(
+// // // //               mainAxisAlignment: MainAxisAlignment.center,
+// // // //               children: [
+// // // //                 const Icon(Icons.error, size: 48, color: Colors.red),
+// // // //                 const SizedBox(height: 8),
+// // // //                 Text(
+// // // //                   'خطأ في تحميل البيانات: ${snapshot.error}',
+// // // //                   textAlign: TextAlign.center,
+// // // //                   style: const TextStyle(fontSize: 14, color: Colors.red),
+// // // //                 ),
+// // // //               ],
+// // // //             ),
+// // // //           );
+// // // //         }
+
+// // // //         final offers = snapshot.data!.docs.map((doc) {
+// // // //           final data = doc.data() as Map<String, dynamic>;
+// // // //           return PriceOffer.fromMap(data, doc.id);
+// // // //         }).toList();
+
+// // // //         if (offers.isEmpty) {
+// // // //           return const Center(
+// // // //             child: Column(
+// // // //               mainAxisAlignment: MainAxisAlignment.center,
+// // // //               children: [
+// // // //                 Icon(Icons.description, size: 64, color: Colors.grey),
+// // // //                 SizedBox(height: 16),
+// // // //                 Text(
+// // // //                   'لا توجد عروض أسعار',
+// // // //                   style: TextStyle(fontSize: 16, color: Colors.grey),
+// // // //                 ),
+// // // //               ],
+// // // //             ),
+// // // //           );
+// // // //         }
+
+// // // //         // جمع كل الرحلات من كل العروض
+// // // //         List<TransportationWithOffer> allTransportations = [];
+// // // //         for (final offer in offers) {
+// // // //           for (final transport in offer.transportations) {
+// // // //             allTransportations.add(
+// // // //               TransportationWithOffer(
+// // // //                 transportation: transport,
+// // // //                 offerId: offer.id,
+// // // //                 companyId: companyId,
+// // // //                 offer: offer,
+// // // //               ),
+// // // //             );
+// // // //           }
+// // // //         }
+
+// // // //         // ✅ ترتيب البيانات أبجديًا حسب: مكان التحميل → مكان التعتيق → نوع العربيه
+// // // //         allTransportations.sort((a, b) {
+// // // //           final aLoading = a.transportation.loadingLocation.toLowerCase();
+// // // //           final bLoading = b.transportation.loadingLocation.toLowerCase();
+
+// // // //           if (aLoading != bLoading) {
+// // // //             return aLoading.compareTo(bLoading);
+// // // //           }
+
+// // // //           final aUnloading = a.transportation.unloadingLocation.toLowerCase();
+// // // //           final bUnloading = b.transportation.unloadingLocation.toLowerCase();
+
+// // // //           if (aUnloading != bUnloading) {
+// // // //             return aUnloading.compareTo(bUnloading);
+// // // //           }
+
+// // // //           final aVehicle = a.transportation.vehicleType.toLowerCase();
+// // // //           final bVehicle = b.transportation.vehicleType.toLowerCase();
+
+// // // //           return aVehicle.compareTo(bVehicle);
+// // // //         });
+
+// // // //         // حفظ البيانات للطباعة
+// // // //         _currentTransportations = allTransportations;
+
+// // // //         return viewType == 'companies'
+// // // //             ? _buildCompaniesTable(allTransportations)
+// // // //             : _buildWheelsTable(allTransportations);
+// // // //       },
+// // // //     );
+// // // //   }
+
+// // // //   // ================= إنشاء PDF =================
+// // // //   Future<void> _generatePDF() async {
+// // // //     if (_arabicFont == null) {
+// // // //       ScaffoldMessenger.of(
+// // // //         context,
+// // // //       ).showSnackBar(const SnackBar(content: Text('الخط العربي غير محمل')));
+// // // //       return;
+// // // //     }
+
+// // // //     if (_currentCompanyName == null ||
+// // // //         _currentViewType == null ||
+// // // //         _currentTransportations == null) {
+// // // //       ScaffoldMessenger.of(
+// // // //         context,
+// // // //       ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للطباعة')));
+// // // //       return;
+// // // //     }
+
+// // // //     setState(() => _isGeneratingPDF = true);
+
+// // // //     try {
+// // // //       // إنشاء PDF
+// // // //       final pdf = pdfLib.Document(
+// // // //         theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
+// // // //       );
+
+// // // //       // تقسيم البيانات إلى صفحات (25 صف لكل صفحة)
+// // // //       final pages = _splitDataIntoPages(_currentTransportations!);
+
+// // // //       for (int pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+// // // //         pdf.addPage(
+// // // //           pdfLib.Page(
+// // // //             pageFormat: PdfPageFormat.a4,
+// // // //             margin: pdfLib.EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+// // // //             build: (context) {
+// // // //               return pdfLib.Column(
+// // // //                 crossAxisAlignment: pdfLib.CrossAxisAlignment.stretch,
+// // // //                 children: [
+// // // //                   // 1. الهيدر - أعلى الصفحة مباشرة
+// // // //                   _buildPdfHeader(),
+// // // //                   pdfLib.SizedBox(height: 10),
+
+// // // //                   // 2. العنوان
+// // // //                   _buildPdfTitle(),
+// // // //                   pdfLib.SizedBox(height: 10),
+
+// // // //                   // 3. إحصائيات العدد
+// // // //                   _buildPdfStats(_currentTransportations!.length),
+// // // //                   pdfLib.SizedBox(height: 10),
+
+// // // //                   // 4. الجدول - يأخذ المساحة المتبقية
+// // // //                   pdfLib.Expanded(
+// // // //                     child: _currentViewType == 'companies'
+// // // //                         ? _buildCompaniesPdfTablePage(
+// // // //                             pages[pageIndex],
+// // // //                             pageIndex,
+// // // //                           )
+// // // //                         : _buildWheelsPdfTablePage(pages[pageIndex], pageIndex),
+// // // //                   ),
+
+// // // //                   // 5. رقم الصفحة (إذا كان هناك أكثر من صفحة)
+// // // //                   if (pages.length > 1) pdfLib.SizedBox(height: 15),
+// // // //                   if (pages.length > 1)
+// // // //                     _buildPageNumber(pageIndex + 1, pages.length),
+// // // //                 ],
+// // // //               );
+// // // //             },
+// // // //           ),
+// // // //         );
+// // // //       }
+
+// // // //       // طباعة PDF
+// // // //       await Printing.layoutPdf(
+// // // //         onLayout: (PdfPageFormat format) async => pdf.save(),
+// // // //         name: _getPDFFileName(),
+// // // //       );
+// // // //     } catch (e) {
+// // // //       ScaffoldMessenger.of(
+// // // //         context,
+// // // //       ).showSnackBar(SnackBar(content: Text('حدث خطأ في إنشاء PDF: $e')));
+// // // //     } finally {
+// // // //       setState(() => _isGeneratingPDF = false);
+// // // //     }
+// // // //   }
+
+// // // //   // ================= تقسيم البيانات إلى صفحات =================
+// // // //   List<List<TransportationWithOffer>> _splitDataIntoPages(
+// // // //     List<TransportationWithOffer> transportations,
+// // // //   ) {
+// // // //     List<List<TransportationWithOffer>> pages = [];
+// // // //     List<TransportationWithOffer> currentPage = [];
+
+// // // //     // حوالي 25-30 صف لكل صفحة A4
+// // // //     int rowsPerPage = 25;
+
+// // // //     for (int i = 0; i < transportations.length; i++) {
+// // // //       currentPage.add(transportations[i]);
+
+// // // //       // إذا وصلنا إلى العدد المحدد أو كانت آخر دفعة
+// // // //       if ((i + 1) % rowsPerPage == 0 || i == transportations.length - 1) {
+// // // //         pages.add(List.from(currentPage));
+// // // //         currentPage.clear();
+// // // //       }
+// // // //     }
+
+// // // //     return pages;
+// // // //   }
+
+// // // //   // ================= بناء الهيدر =================
+// // // //   pdfLib.Widget _buildPdfHeader() {
+// // // //     return pdfLib.Directionality(
+// // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // //       child: pdfLib.Row(
+// // // //         mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+// // // //         children: [
+// // // //           pdfLib.Text(
+// // // //             'FM 454.4 - 203/317/21',
+// // // //             style: pdfLib.TextStyle(
+// // // //               fontSize: 12,
+// // // //               fontWeight: pdfLib.FontWeight.bold,
+// // // //               font: _arabicFont,
+// // // //             ),
+// // // //           ),
+// // // //           pdfLib.Text(
+// // // //             _currentViewType == 'companies'
+// // // //                 ? 'عروض أسعار الشركات'
+// // // //                 : 'عروض أسعار العجل',
+// // // //             style: pdfLib.TextStyle(
+// // // //               fontSize: 18,
+// // // //               fontWeight: pdfLib.FontWeight.bold,
+// // // //               font: _arabicFont,
+// // // //             ),
+// // // //           ),
+// // // //         ],
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // ================= بناء العنوان =================
+// // // //   pdfLib.Widget _buildPdfTitle() {
+// // // //     return pdfLib.Directionality(
+// // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // //       child: pdfLib.Column(
+// // // //         children: [
+// // // //           pdfLib.Text(
+// // // //             _currentCompanyName!,
+// // // //             style: pdfLib.TextStyle(
+// // // //               fontSize: 16,
+// // // //               fontWeight: pdfLib.FontWeight.bold,
+// // // //               font: _arabicFont,
+// // // //             ),
+// // // //             textAlign: pdfLib.TextAlign.center,
+// // // //           ),
+// // // //           pdfLib.SizedBox(height: 5),
+// // // //           pdfLib.Text(
+// // // //             'تاريخ الطباعة: ${DateFormat('yyyy/MM/dd').format(DateTime.now())}',
+// // // //             style: pdfLib.TextStyle(fontSize: 11, font: _arabicFont),
+// // // //           ),
+// // // //         ],
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // ================= بناء الإحصائيات =================
+// // // //   pdfLib.Widget _buildPdfStats(int total) {
+// // // //     return pdfLib.Directionality(
+// // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // //       child: pdfLib.Container(
+// // // //         padding: pdfLib.EdgeInsets.all(8),
+// // // //         decoration: pdfLib.BoxDecoration(
+// // // //           border: pdfLib.Border.all(color: PdfColors.black, width: 1.5),
+// // // //         ),
+// // // //         child: pdfLib.Row(
+// // // //           mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+// // // //           children: [
+// // // //             pdfLib.Text(
+// // // //               'إجمالي العروض',
+// // // //               style: pdfLib.TextStyle(
+// // // //                 fontSize: 14,
+// // // //                 fontWeight: pdfLib.FontWeight.bold,
+// // // //                 font: _arabicFont,
+// // // //               ),
+// // // //             ),
+// // // //             pdfLib.Text(
+// // // //               '$total',
+// // // //               style: pdfLib.TextStyle(
+// // // //                 fontSize: 16,
+// // // //                 fontWeight: pdfLib.FontWeight.bold,
+// // // //                 font: _arabicFont,
+// // // //               ),
+// // // //             ),
+// // // //           ],
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // ================= بناء جدول الشركات للصفحة =================
+// // // //   pdfLib.Widget _buildCompaniesPdfTablePage(
+// // // //     List<TransportationWithOffer> transportations,
+// // // //     int pageIndex,
+// // // //   ) {
+// // // //     return pdfLib.Directionality(
+// // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // //       child: pdfLib.Table(
+// // // //         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
+// // // //         columnWidths: {
+// // // //           6: pdfLib.FlexColumnWidth(0.4), // م
+// // // //           5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
+// // // //           4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
+// // // //           3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
+// // // //           2: pdfLib.FlexColumnWidth(1.0), // النولون
+// // // //           1: pdfLib.FlexColumnWidth(1.0), // المبيت
+// // // //           0: pdfLib.FlexColumnWidth(1.0), // العطلة
+// // // //         },
+// // // //         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
+// // // //         children: [
+// // // //           // رأس الجدول
+// // // //           pdfLib.TableRow(
+// // // //             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
+// // // //             children: [
+// // // //               _buildCompactHeaderCell('العطلة'),
+// // // //               _buildCompactHeaderCell('المبيت'),
+// // // //               _buildCompactHeaderCell('النولون'),
+// // // //               _buildCompactHeaderCell('نوع العربية'),
+// // // //               _buildCompactHeaderCell('مكان التعتيق'),
+// // // //               _buildCompactHeaderCell('مكان التحميل'),
+// // // //               _buildCompactHeaderCell('م'),
+// // // //             ],
+// // // //           ),
+
+// // // //           // بيانات الجدول
+// // // //           ...transportations.asMap().entries.map((entry) {
+// // // //             int index = (pageIndex * 25) + entry.key + 1;
+// // // //             final item = entry.value;
+// // // //             final transport = item.transportation;
+
+// // // //             return pdfLib.TableRow(
+// // // //               decoration: entry.key % 2 == 0
+// // // //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
+// // // //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
+// // // //               children: [
+// // // //                 _buildCompactDataCell('${transport.companyHoliday}'),
+// // // //                 _buildCompactDataCell('${transport.companyOvernight}'),
+// // // //                 _buildCompactDataCell('${transport.nolon}'),
+// // // //                 _buildCompactDataCell(transport.vehicleType),
+// // // //                 _buildCompactDataCell(transport.unloadingLocation),
+// // // //                 _buildCompactDataCell(transport.loadingLocation),
+// // // //                 _buildCompactDataCell(index.toString()),
+// // // //               ],
+// // // //             );
+// // // //           }),
+// // // //         ],
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // ================= بناء جدول العجل للصفحة =================
+// // // //   pdfLib.Widget _buildWheelsPdfTablePage(
+// // // //     List<TransportationWithOffer> transportations,
+// // // //     int pageIndex,
+// // // //   ) {
+// // // //     return pdfLib.Directionality(
+// // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // //       child: pdfLib.Table(
+// // // //         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
+// // // //         columnWidths: {
+// // // //           6: pdfLib.FlexColumnWidth(0.4), // م
+// // // //           5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
+// // // //           4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
+// // // //           3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
+// // // //           2: pdfLib.FlexColumnWidth(1.0), // النولون
+// // // //           1: pdfLib.FlexColumnWidth(1.0), // المبيت
+// // // //           0: pdfLib.FlexColumnWidth(1.0), // العطلة
+// // // //         },
+// // // //         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
+// // // //         children: [
+// // // //           // رأس الجدول
+// // // //           pdfLib.TableRow(
+// // // //             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
+// // // //             children: [
+// // // //               _buildCompactHeaderCell('العطلة'),
+// // // //               _buildCompactHeaderCell('المبيت'),
+// // // //               _buildCompactHeaderCell('النولون'),
+// // // //               _buildCompactHeaderCell('نوع العربية'),
+// // // //               _buildCompactHeaderCell('مكان التعتيق'),
+// // // //               _buildCompactHeaderCell('مكان التحميل'),
+// // // //               _buildCompactHeaderCell('م'),
+// // // //             ],
+// // // //           ),
+
+// // // //           // بيانات الجدول
+// // // //           ...transportations.asMap().entries.map((entry) {
+// // // //             int index = (pageIndex * 25) + entry.key + 1;
+// // // //             final item = entry.value;
+// // // //             final transport = item.transportation;
+
+// // // //             return pdfLib.TableRow(
+// // // //               decoration: entry.key % 2 == 0
+// // // //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
+// // // //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
+// // // //               children: [
+// // // //                 _buildCompactDataCell('${transport.wheelHoliday}'),
+// // // //                 _buildCompactDataCell('${transport.wheelOvernight}'),
+// // // //                 _buildCompactDataCell('${transport.wheelNolon}'),
+// // // //                 _buildCompactDataCell(transport.vehicleType),
+// // // //                 _buildCompactDataCell(transport.unloadingLocation),
+// // // //                 _buildCompactDataCell(transport.loadingLocation),
+// // // //                 _buildCompactDataCell(index.toString()),
+// // // //               ],
+// // // //             );
+// // // //           }),
+// // // //         ],
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // ================= بناء خلية رأس مضغوطة =================
+// // // //   pdfLib.Widget _buildCompactHeaderCell(String text) {
+// // // //     return pdfLib.Container(
+// // // //       padding: pdfLib.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+// // // //       child: pdfLib.Text(
+// // // //         text,
+// // // //         style: pdfLib.TextStyle(
+// // // //           fontSize: 11,
+// // // //           fontWeight: pdfLib.FontWeight.bold,
+// // // //           font: _arabicFont,
+// // // //           color: PdfColors.black,
+// // // //         ),
+// // // //         textAlign: pdfLib.TextAlign.center,
+// // // //         maxLines: 2,
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // ================= بناء خلية بيانات مضغوطة =================
+// // // //   pdfLib.Widget _buildCompactDataCell(String text) {
+// // // //     return pdfLib.Container(
+// // // //       padding: pdfLib.EdgeInsets.symmetric(vertical: 5, horizontal: 3),
+// // // //       child: pdfLib.Text(
+// // // //         text,
+// // // //         style: pdfLib.TextStyle(
+// // // //           fontSize: 10,
+// // // //           font: _arabicFont,
+// // // //           color: PdfColors.black,
+// // // //         ),
+// // // //         textAlign: pdfLib.TextAlign.center,
+// // // //         maxLines: 2,
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // ================= بناء رقم الصفحة =================
+// // // //   pdfLib.Widget _buildPageNumber(int currentPage, int totalPages) {
+// // // //     return pdfLib.Directionality(
+// // // //       textDirection: pdfLib.TextDirection.rtl,
+// // // //       child: pdfLib.Container(
+// // // //         alignment: pdfLib.Alignment.center,
+// // // //         child: pdfLib.Text(
+// // // //           'الصفحة $currentPage من $totalPages',
+// // // //           style: pdfLib.TextStyle(
+// // // //             fontSize: 10,
+// // // //             font: _arabicFont,
+// // // //             color: PdfColors.grey600,
+// // // //           ),
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // ================= الحصول على اسم الملف =================
+// // // //   String _getPDFFileName() {
+// // // //     final now = DateTime.now();
+// // // //     final formattedDate = DateFormat('yyyyMMdd').format(now);
+// // // //     final viewTypeText = _currentViewType == 'companies' ? 'شركات' : 'عجل';
+// // // //     return 'عروض_اسعار_${viewTypeText}_${_currentCompanyName}_$formattedDate';
+// // // //   }
+
+// // // //   Widget _buildCompaniesTable(List<TransportationWithOffer> transportations) {
+// // // //     return Container(
+// // // //       decoration: BoxDecoration(
+// // // //         borderRadius: BorderRadius.circular(10),
+// // // //         border: Border.all(color: Colors.transparent, width: 1.5),
+// // // //       ),
+// // // //       child: SingleChildScrollView(
+// // // //         scrollDirection: Axis.horizontal,
+// // // //         child: SingleChildScrollView(
+// // // //           scrollDirection: Axis.vertical,
+// // // //           physics: const ClampingScrollPhysics(), // ✅ حل مشكلة التهنيج
+// // // //           child: Table(
+// // // //             defaultColumnWidth: const FixedColumnWidth(150),
+// // // //             border: TableBorder.all(color: const Color(0xFF3498DB), width: 1),
+// // // //             children: [
+// // // //               /// ✅ العناوين - جدول الشركات
+// // // //               TableRow(
+// // // //                 decoration: BoxDecoration(
+// // // //                   color: const Color(0xFF3498DB).withOpacity(0.15),
+// // // //                 ),
+// // // //                 children: const [
+// // // //                   _TableCellHeader('م'),
+// // // //                   _TableCellHeader('مكان التحميل'),
+// // // //                   _TableCellHeader('مكان التعتيق'),
+// // // //                   _TableCellHeader('نوع العربية'),
+// // // //                   _TableCellHeader('النولون'),
+// // // //                   _TableCellHeader('المبيت'),
+// // // //                   _TableCellHeader('العطلة'),
+// // // //                   _TableCellHeader('الإجراءات'),
+// // // //                 ],
+// // // //               ),
+
+// // // //               /// ✅ الصفوف - جدول الشركات
+// // // //               ...transportations.asMap().entries.map((entry) {
+// // // //                 final index = entry.key;
+// // // //                 final item = entry.value;
+// // // //                 final transport = item.transportation;
+
+// // // //                 return TableRow(
+// // // //                   decoration: BoxDecoration(
+// // // //                     color: index.isEven
+// // // //                         ? Colors.white
+// // // //                         : const Color(0xFFF8F9FA),
+// // // //                   ),
+// // // //                   children: [
+// // // //                     _TableCellBody('${index + 1}'),
+// // // //                     _TableCellBody(transport.loadingLocation),
+// // // //                     _TableCellBody(transport.unloadingLocation),
+// // // //                     _TableCellBody(transport.vehicleType),
+// // // //                     _TableCellBody('${transport.nolon} ج'),
+// // // //                     _TableCellBody('${transport.companyOvernight} ج'),
+// // // //                     _TableCellBody('${transport.companyHoliday} ج'),
+// // // //                     _TableCellActions(
+// // // //                       onEdit: () => _editTransportation(item, 'companies'),
+// // // //                       onDelete: () => _deleteTransportation(item),
+// // // //                     ),
+// // // //                   ],
+// // // //                 );
+// // // //               }),
+// // // //             ],
+// // // //           ),
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   Widget _buildWheelsTable(List<TransportationWithOffer> transportations) {
+// // // //     return Container(
+// // // //       decoration: BoxDecoration(
+// // // //         borderRadius: BorderRadius.circular(10),
+// // // //         border: Border.all(color: Colors.transparent, width: 1.5),
+// // // //       ),
+// // // //       child: SingleChildScrollView(
+// // // //         scrollDirection: Axis.horizontal,
+// // // //         child: SingleChildScrollView(
+// // // //           scrollDirection: Axis.vertical,
+// // // //           physics: const ClampingScrollPhysics(), // ✅ حل مشكلة التهنيج
+// // // //           child: Table(
+// // // //             defaultColumnWidth: const FixedColumnWidth(150),
+// // // //             border: TableBorder.all(color: const Color(0xFF6A1B9A), width: 1),
+// // // //             children: [
+// // // //               /// ✅ العناوين - جدول العجل
+// // // //               TableRow(
+// // // //                 decoration: BoxDecoration(
+// // // //                   color: const Color(0xFF6A1B9A).withOpacity(0.15),
+// // // //                 ),
+// // // //                 children: const [
+// // // //                   _TableCellHeader('م'),
+// // // //                   _TableCellHeader('مكان التحميل'),
+// // // //                   _TableCellHeader('مكان التعتيق'),
+// // // //                   _TableCellHeader('نوع العربية'),
+// // // //                   _TableCellHeader('النولون'),
+// // // //                   _TableCellHeader('المبيت'),
+// // // //                   _TableCellHeader('العطلة'),
+// // // //                   _TableCellHeader('الإجراءات'),
+// // // //                 ],
+// // // //               ),
+
+// // // //               /// ✅ الصفوف - جدول العجل
+// // // //               ...transportations.asMap().entries.map((entry) {
+// // // //                 final index = entry.key;
+// // // //                 final item = entry.value;
+// // // //                 final transport = item.transportation;
+
+// // // //                 return TableRow(
+// // // //                   decoration: BoxDecoration(
+// // // //                     color: index.isEven
+// // // //                         ? Colors.white
+// // // //                         : const Color(0xFFF8F9FA),
+// // // //                   ),
+// // // //                   children: [
+// // // //                     _TableCellBody('${index + 1}'),
+// // // //                     _TableCellBody(transport.loadingLocation),
+// // // //                     _TableCellBody(transport.unloadingLocation),
+// // // //                     _TableCellBody(transport.vehicleType),
+// // // //                     _TableCellBody('${transport.wheelNolon} ج'),
+// // // //                     _TableCellBody('${transport.wheelOvernight} ج'),
+// // // //                     _TableCellBody('${transport.wheelHoliday} ج'),
+// // // //                     _TableCellActions(
+// // // //                       onEdit: () => _editTransportation(item, 'wheels'),
+// // // //                       onDelete: () => _deleteTransportation(item),
+// // // //                     ),
+// // // //                   ],
+// // // //                 );
+// // // //               }),
+// // // //             ],
+// // // //           ),
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // دالة تعديل الرحلة
+// // // //   void _editTransportation(TransportationWithOffer item, String viewType) {
+// // // //     final transportation = item.transportation;
+// // // //     final isCompaniesView = viewType == 'companies';
+
+// // // //     final loadingLocationController = TextEditingController(
+// // // //       text: transportation.loadingLocation,
+// // // //     );
+// // // //     final unloadingLocationController = TextEditingController(
+// // // //       text: transportation.unloadingLocation,
+// // // //     );
+// // // //     final vehicleTypeController = TextEditingController(
+// // // //       text: transportation.vehicleType,
+// // // //     );
+// // // //     final nolonController = TextEditingController(
+// // // //       text: isCompaniesView
+// // // //           ? transportation.nolon.toString()
+// // // //           : transportation.wheelNolon.toString(),
+// // // //     );
+// // // //     final overnightController = TextEditingController(
+// // // //       text: isCompaniesView
+// // // //           ? transportation.companyOvernight.toString()
+// // // //           : transportation.wheelOvernight.toString(),
+// // // //     );
+// // // //     final holidayController = TextEditingController(
+// // // //       text: isCompaniesView
+// // // //           ? transportation.companyHoliday.toString()
+// // // //           : transportation.wheelHoliday.toString(),
+// // // //     );
+// // // //     final notesController = TextEditingController(
+// // // //       text: transportation.notes ?? '',
+// // // //     );
+
+// // // //     showDialog(
+// // // //       context: context,
+// // // //       builder: (context) => Directionality(
+// // // //         textDirection: t.TextDirection.rtl,
+// // // //         child: Dialog(
+// // // //           backgroundColor: Colors.white,
+// // // //           shape: RoundedRectangleBorder(
+// // // //             borderRadius: BorderRadius.circular(16),
+// // // //           ),
+// // // //           child: SingleChildScrollView(
+// // // //             child: Container(
+// // // //               padding: const EdgeInsets.all(24),
+// // // //               width: MediaQuery.of(context).size.width * 0.9,
+// // // //               child: Column(
+// // // //                 mainAxisSize: MainAxisSize.min,
+// // // //                 crossAxisAlignment: CrossAxisAlignment.start,
+// // // //                 children: [
+// // // //                   // العنوان
+// // // //                   Row(
+// // // //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// // // //                     children: [
+// // // //                       Text(
+// // // //                         'تعديل الرحلة - ${isCompaniesView ? 'الشركات' : 'العجل'}',
+// // // //                         style: const TextStyle(
+// // // //                           fontSize: 20,
+// // // //                           fontWeight: FontWeight.bold,
+// // // //                           color: Color(0xFF2C3E50),
+// // // //                         ),
+// // // //                       ),
+// // // //                       IconButton(
+// // // //                         icon: const Icon(Icons.close),
+// // // //                         onPressed: () => Navigator.pop(context),
+// // // //                       ),
+// // // //                     ],
+// // // //                   ),
+
+// // // //                   const SizedBox(height: 8),
+// // // //                   Divider(color: const Color(0xFF3498DB).withOpacity(0.3)),
+
+// // // //                   const SizedBox(height: 20),
+
+// // // //                   // حقل مكان التحميل
+// // // //                   _buildEditField(
+// // // //                     'مكان التحميل',
+// // // //                     'أدخل مكان التحميل',
+// // // //                     loadingLocationController,
+// // // //                     Icons.location_on,
+// // // //                   ),
+
+// // // //                   const SizedBox(height: 16),
+
+// // // //                   // حقل مكان التعتيق
+// // // //                   _buildEditField(
+// // // //                     'مكان التعتيق',
+// // // //                     'أدخل مكان التعتيق',
+// // // //                     unloadingLocationController,
+// // // //                     Icons.location_on,
+// // // //                   ),
+
+// // // //                   const SizedBox(height: 16),
+
+// // // //                   // حقل نوع العربية
+// // // //                   _buildEditField(
+// // // //                     'نوع العربية',
+// // // //                     'أدخل نوع العربية',
+// // // //                     vehicleTypeController,
+// // // //                     Icons.directions_car,
+// // // //                   ),
+
+// // // //                   const SizedBox(height: 16),
+
+// // // //                   // حقل النولون
+// // // //                   _buildEditField(
+// // // //                     'النولون',
+// // // //                     'أدخل النولون',
+// // // //                     nolonController,
+// // // //                     Icons.attach_money,
+// // // //                     keyboardType: TextInputType.number,
+// // // //                   ),
+
+// // // //                   const SizedBox(height: 16),
+
+// // // //                   // حقل المبيت
+// // // //                   _buildEditField(
+// // // //                     'المبيت',
+// // // //                     'أدخل المبيت',
+// // // //                     overnightController,
+// // // //                     Icons.hotel,
+// // // //                     keyboardType: TextInputType.number,
+// // // //                   ),
+
+// // // //                   const SizedBox(height: 16),
+
+// // // //                   // حقل العطلة
+// // // //                   _buildEditField(
+// // // //                     'العطلة',
+// // // //                     'أدخل العطلة',
+// // // //                     holidayController,
+// // // //                     Icons.beach_access,
+// // // //                     keyboardType: TextInputType.number,
+// // // //                   ),
+
+// // // //                   const SizedBox(height: 16),
+
+// // // //                   // حقل الملاحظات
+// // // //                   _buildEditField(
+// // // //                     'ملاحظات',
+// // // //                     'أدخل الملاحظات (اختياري)',
+// // // //                     notesController,
+// // // //                     Icons.note,
+// // // //                     maxLines: 3,
+// // // //                   ),
+
+// // // //                   const SizedBox(height: 24),
+
+// // // //                   // أزرار الحفظ والإلغاء
+// // // //                   Row(
+// // // //                     children: [
+// // // //                       Expanded(
+// // // //                         child: OutlinedButton(
+// // // //                           onPressed: () => Navigator.pop(context),
+// // // //                           style: OutlinedButton.styleFrom(
+// // // //                             padding: const EdgeInsets.symmetric(vertical: 12),
+// // // //                             shape: RoundedRectangleBorder(
+// // // //                               borderRadius: BorderRadius.circular(8),
+// // // //                             ),
+// // // //                           ),
+// // // //                           child: const Text(
+// // // //                             'إلغاء',
+// // // //                             style: TextStyle(
+// // // //                               color: Color(0xFF2C3E50),
+// // // //                               fontWeight: FontWeight.bold,
+// // // //                             ),
+// // // //                           ),
+// // // //                         ),
+// // // //                       ),
+// // // //                       const SizedBox(width: 12),
+// // // //                       Expanded(
+// // // //                         child: ElevatedButton(
+// // // //                           onPressed: () {
+// // // //                             _updateTransportation(
+// // // //                               item,
+// // // //                               loadingLocationController.text,
+// // // //                               unloadingLocationController.text,
+// // // //                               vehicleTypeController.text,
+// // // //                               nolonController.text,
+// // // //                               overnightController.text,
+// // // //                               holidayController.text,
+// // // //                               notesController.text,
+// // // //                               isCompaniesView,
+// // // //                             );
+// // // //                             Navigator.pop(context);
+// // // //                           },
+// // // //                           style: ElevatedButton.styleFrom(
+// // // //                             backgroundColor: const Color(0xFF3498DB),
+// // // //                             foregroundColor: Colors.white,
+// // // //                             padding: const EdgeInsets.symmetric(vertical: 12),
+// // // //                             shape: RoundedRectangleBorder(
+// // // //                               borderRadius: BorderRadius.circular(8),
+// // // //                             ),
+// // // //                           ),
+// // // //                           child: const Text(
+// // // //                             'حفظ التعديلات',
+// // // //                             style: TextStyle(fontWeight: FontWeight.bold),
+// // // //                           ),
+// // // //                         ),
+// // // //                       ),
+// // // //                     ],
+// // // //                   ),
+// // // //                 ],
+// // // //               ),
+// // // //             ),
+// // // //           ),
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   Widget _buildEditField(
+// // // //     String label,
+// // // //     String hint,
+// // // //     TextEditingController controller,
+// // // //     IconData icon, {
+// // // //     TextInputType keyboardType = TextInputType.text,
+// // // //     int maxLines = 1,
+// // // //   }) {
+// // // //     return Column(
+// // // //       crossAxisAlignment: CrossAxisAlignment.start,
+// // // //       children: [
+// // // //         Text(
+// // // //           label,
+// // // //           style: const TextStyle(
+// // // //             fontWeight: FontWeight.bold,
+// // // //             color: Color(0xFF2C3E50),
+// // // //             fontSize: 14,
+// // // //           ),
+// // // //         ),
+// // // //         const SizedBox(height: 6),
+// // // //         TextFormField(
+// // // //           controller: controller,
+// // // //           keyboardType: keyboardType,
+// // // //           maxLines: maxLines,
+// // // //           decoration: InputDecoration(
+// // // //             hintText: hint,
+// // // //             prefixIcon: Icon(icon, color: const Color(0xFF3498DB)),
+// // // //             filled: true,
+// // // //             fillColor: const Color(0xFFF4F6F8),
+// // // //             border: OutlineInputBorder(
+// // // //               borderRadius: BorderRadius.circular(8),
+// // // //               borderSide: BorderSide.none,
+// // // //             ),
+// // // //             contentPadding: const EdgeInsets.symmetric(
+// // // //               horizontal: 16,
+// // // //               vertical: 12,
+// // // //             ),
+// // // //           ),
+// // // //         ),
+// // // //       ],
+// // // //     );
+// // // //   }
+
+// // // //   // دالة تحديث الرحلة في Firebase
+// // // //   Future<void> _updateTransportation(
+// // // //     TransportationWithOffer item,
+// // // //     String loadingLocation,
+// // // //     String unloadingLocation,
+// // // //     String vehicleType,
+// // // //     String nolon,
+// // // //     String overnight,
+// // // //     String holiday,
+// // // //     String notes,
+// // // //     bool isCompaniesView,
+// // // //   ) async {
+// // // //     try {
+// // // //       final offerRef = _firestore
+// // // //           .collection('companies')
+// // // //           .doc(item.companyId)
+// // // //           .collection('priceOffers')
+// // // //           .doc(item.offerId);
+
+// // // //       // جلب العرض الحالي
+// // // //       final offerDoc = await offerRef.get();
+// // // //       final offerData = offerDoc.data() as Map<String, dynamic>;
+// // // //       final List<dynamic> transportations = offerData['transportations'];
+
+// // // //       // تحديث الرحلة المحددة
+// // // //       final updatedTransportations = transportations.map((transport) {
+// // // //         final map = transport as Map<String, dynamic>;
+// // // //         if (map['loadingLocation'] == item.transportation.loadingLocation &&
+// // // //             map['unloadingLocation'] == item.transportation.unloadingLocation &&
+// // // //             map['vehicleType'] == item.transportation.vehicleType) {
+// // // //           final updatedMap = {
+// // // //             ...map,
+// // // //             'loadingLocation': loadingLocation.trim(),
+// // // //             'unloadingLocation': unloadingLocation.trim(),
+// // // //             'vehicleType': vehicleType.trim(),
+// // // //             'notes': notes.trim().isEmpty ? null : notes.trim(),
+// // // //           };
+
+// // // //           // تحديث الحقول حسب النوع
+// // // //           if (isCompaniesView) {
+// // // //             updatedMap['nolon'] =
+// // // //                 double.tryParse(nolon) ?? item.transportation.nolon;
+// // // //             updatedMap['companyOvernight'] =
+// // // //                 double.tryParse(overnight) ??
+// // // //                 item.transportation.companyOvernight;
+// // // //             updatedMap['companyHoliday'] =
+// // // //                 double.tryParse(holiday) ?? item.transportation.companyHoliday;
+// // // //           } else {
+// // // //             updatedMap['wheelNolon'] =
+// // // //                 double.tryParse(nolon) ?? item.transportation.wheelNolon;
+// // // //             updatedMap['wheelOvernight'] =
+// // // //                 double.tryParse(overnight) ??
+// // // //                 item.transportation.wheelOvernight;
+// // // //             updatedMap['wheelHoliday'] =
+// // // //                 double.tryParse(holiday) ?? item.transportation.wheelHoliday;
+// // // //           }
+
+// // // //           return updatedMap;
+// // // //         }
+// // // //         return transport;
+// // // //       }).toList();
+
+// // // //       // تحديث العرض في Firebase
+// // // //       await offerRef.update({
+// // // //         'transportations': updatedTransportations,
+// // // //         'updatedAt': Timestamp.now(),
+// // // //       });
+
+// // // //       // إظهار رسالة نجاح
+// // // //       if (mounted) {
+// // // //         ScaffoldMessenger.of(context).showSnackBar(
+// // // //           const SnackBar(
+// // // //             content: Text('تم تعديل الرحلة بنجاح'),
+// // // //             backgroundColor: Colors.green,
+// // // //             duration: Duration(seconds: 2),
+// // // //           ),
+// // // //         );
+// // // //       }
+// // // //     } catch (e) {
+// // // //       print('Error updating transportation: $e');
+// // // //       if (mounted) {
+// // // //         ScaffoldMessenger.of(context).showSnackBar(
+// // // //           SnackBar(
+// // // //             content: Text('خطأ في التعديل: $e'),
+// // // //             backgroundColor: Colors.red,
+// // // //             duration: const Duration(seconds: 3),
+// // // //           ),
+// // // //         );
+// // // //       }
+// // // //     }
+// // // //   }
+
+// // // //   // دالة حذف الرحلة
+// // // //   void _deleteTransportation(TransportationWithOffer item) {
+// // // //     showDialog(
+// // // //       context: context,
+// // // //       builder: (context) => Directionality(
+// // // //         textDirection: t.TextDirection.rtl,
+// // // //         child: AlertDialog(
+// // // //           backgroundColor: Colors.white,
+// // // //           shape: RoundedRectangleBorder(
+// // // //             borderRadius: BorderRadius.circular(16),
+// // // //           ),
+// // // //           title: const Row(
+// // // //             children: [
+// // // //               Icon(Icons.warning, color: Colors.orange),
+// // // //               SizedBox(width: 8),
+// // // //               Text(
+// // // //                 'تأكيد الحذف',
+// // // //                 style: TextStyle(
+// // // //                   fontWeight: FontWeight.bold,
+// // // //                   color: Color(0xFF2C3E50),
+// // // //                 ),
+// // // //               ),
+// // // //             ],
+// // // //           ),
+// // // //           content: Column(
+// // // //             mainAxisSize: MainAxisSize.min,
+// // // //             crossAxisAlignment: CrossAxisAlignment.start,
+// // // //             children: [
+// // // //               const Text(
+// // // //                 'هل أنت متأكد من حذف هذه الرحلة؟',
+// // // //                 style: TextStyle(fontSize: 16),
+// // // //               ),
+// // // //               const SizedBox(height: 8),
+// // // //               Text(
+// // // //                 'المسار: ${item.transportation.loadingLocation} → ${item.transportation.unloadingLocation}',
+// // // //                 style: const TextStyle(color: Colors.grey),
+// // // //               ),
+// // // //               Text(
+// // // //                 'النولون: ${item.transportation.nolon} ج',
+// // // //                 style: const TextStyle(color: Colors.grey),
+// // // //               ),
+// // // //               const SizedBox(height: 16),
+// // // //               const Text(
+// // // //                 '⚠️ لا يمكن التراجع عن هذا الإجراء',
+// // // //                 style: TextStyle(
+// // // //                   color: Colors.red,
+// // // //                   fontSize: 12,
+// // // //                   fontWeight: FontWeight.bold,
+// // // //                 ),
+// // // //               ),
+// // // //             ],
+// // // //           ),
+// // // //           actions: [
+// // // //             TextButton(
+// // // //               onPressed: () => Navigator.pop(context),
+// // // //               child: const Text(
+// // // //                 'إلغاء',
+// // // //                 style: TextStyle(color: Color(0xFF2C3E50)),
+// // // //               ),
+// // // //             ),
+// // // //             ElevatedButton(
+// // // //               onPressed: () {
+// // // //                 _confirmDeleteTransportation(item);
+// // // //                 Navigator.pop(context);
+// // // //               },
+// // // //               style: ElevatedButton.styleFrom(
+// // // //                 backgroundColor: Colors.red,
+// // // //                 foregroundColor: Colors.white,
+// // // //               ),
+// // // //               child: const Text('حذف'),
+// // // //             ),
+// // // //           ],
+// // // //         ),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   // دالة تأكيد الحذف
+// // // //   Future<void> _confirmDeleteTransportation(
+// // // //     TransportationWithOffer item,
+// // // //   ) async {
+// // // //     try {
+// // // //       final offerRef = _firestore
+// // // //           .collection('companies')
+// // // //           .doc(item.companyId)
+// // // //           .collection('priceOffers')
+// // // //           .doc(item.offerId);
+
+// // // //       // جلب العرض الحالي
+// // // //       final offerDoc = await offerRef.get();
+// // // //       final offerData = offerDoc.data() as Map<String, dynamic>;
+// // // //       final List<dynamic> transportations = offerData['transportations'];
+
+// // // //       // تصفية الرحلة المطلوب حذفها
+// // // //       final updatedTransportations = transportations.where((transport) {
+// // // //         final map = transport as Map<String, dynamic>;
+// // // //         return !(map['loadingLocation'] ==
+// // // //                 item.transportation.loadingLocation &&
+// // // //             map['unloadingLocation'] == item.transportation.unloadingLocation &&
+// // // //             map['vehicleType'] == item.transportation.vehicleType);
+// // // //       }).toList();
+
+// // // //       // إذا لم يتبقى أي رحلات، احذف العرض كاملاً
+// // // //       if (updatedTransportations.isEmpty) {
+// // // //         await offerRef.delete();
+// // // //       } else {
+// // // //         // وإلا قم بتحديث العرض
+// // // //         await offerRef.update({
+// // // //           'transportations': updatedTransportations,
+// // // //           'updatedAt': Timestamp.now(),
+// // // //         });
+// // // //       }
+
+// // // //       // إظهار رسالة نجاح
+// // // //       if (mounted) {
+// // // //         ScaffoldMessenger.of(context).showSnackBar(
+// // // //           const SnackBar(
+// // // //             content: Text('تم حذف الرحلة بنجاح'),
+// // // //             backgroundColor: Colors.green,
+// // // //             duration: Duration(seconds: 2),
+// // // //           ),
+// // // //         );
+// // // //       }
+// // // //     } catch (e) {
+// // // //       print('Error deleting transportation: $e');
+// // // //       if (mounted) {
+// // // //         ScaffoldMessenger.of(context).showSnackBar(
+// // // //           SnackBar(
+// // // //             content: Text('خطأ في الحذف: $e'),
+// // // //             backgroundColor: Colors.red,
+// // // //             duration: const Duration(seconds: 3),
+// // // //           ),
+// // // //         );
+// // // //       }
+// // // //     }
+// // // //   }
+
+// // // //   Widget _buildActionButton({
+// // // //     required IconData icon,
+// // // //     required String label,
+// // // //     required Color color,
+// // // //     required VoidCallback onPressed,
+// // // //   }) {
+// // // //     return ElevatedButton.icon(
+// // // //       onPressed: onPressed,
+// // // //       icon: Icon(icon, size: 18),
+// // // //       label: Text(label),
+// // // //       style: ElevatedButton.styleFrom(
+// // // //         backgroundColor: color.withOpacity(0.9),
+// // // //         foregroundColor: Colors.white,
+// // // //         elevation: 0,
+// // // //         padding: const EdgeInsets.symmetric(vertical: 10),
+// // // //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+// // // //       ),
+// // // //     );
+// // // //   }
+
+// // // //   String _formatDate(DateTime date) {
+// // // //     return '${date.day}/${date.month}/${date.year}';
+// // // //   }
+// // // // }
+
+// // // // // نموذج مساعد لتخزين معلومات الرحلة مع معلومات العرض
+// // // // class TransportationWithOffer {
+// // // //   final Transportation transportation;
+// // // //   final offerId;
+// // // //   final String companyId;
+// // // //   final PriceOffer offer;
+
+// // // //   TransportationWithOffer({
+// // // //     required this.transportation,
+// // // //     required this.offerId,
+// // // //     required this.companyId,
+// // // //     required this.offer,
+// // // //   });
+// // // // }
+
+// // // // class _TableCellBody extends StatelessWidget {
+// // // //   final String text;
+// // // //   final TextStyle? textStyle;
+
+// // // //   const _TableCellBody(this.text, {this.textStyle});
+
+// // // //   @override
+// // // //   Widget build(BuildContext context) {
+// // // //     return Container(
+// // // //       height: 48,
+// // // //       alignment: Alignment.center,
+// // // //       padding: const EdgeInsets.symmetric(horizontal: 8),
+// // // //       child: Text(
+// // // //         text,
+// // // //         maxLines: 2,
+// // // //         overflow: TextOverflow.ellipsis,
+// // // //         textAlign: TextAlign.center,
+// // // //         style: textStyle,
+// // // //       ),
+// // // //     );
+// // // //   }
+// // // // }
+
+// // // // class _TableCellHeader extends StatelessWidget {
+// // // //   final String text;
+// // // //   const _TableCellHeader(this.text);
+
+// // // //   @override
+// // // //   Widget build(BuildContext context) {
+// // // //     return Container(
+// // // //       height: 50,
+// // // //       alignment: Alignment.center,
+// // // //       padding: const EdgeInsets.symmetric(horizontal: 8),
+// // // //       child: Text(
+// // // //         text,
+// // // //         style: const TextStyle(
+// // // //           fontWeight: FontWeight.bold,
+// // // //           fontSize: 14,
+// // // //           color: Color(0xFF2C3E50),
+// // // //         ),
+// // // //         textAlign: TextAlign.center,
+// // // //       ),
+// // // //     );
+// // // //   }
+// // // // }
+
+// // // // class _TableCellActions extends StatelessWidget {
+// // // //   final VoidCallback onEdit;
+// // // //   final VoidCallback onDelete;
+
+// // // //   const _TableCellActions({required this.onEdit, required this.onDelete});
+
+// // // //   @override
+// // // //   Widget build(BuildContext context) {
+// // // //     return Container(
+// // // //       height: 48,
+// // // //       alignment: Alignment.center,
+// // // //       padding: const EdgeInsets.symmetric(horizontal: 4),
+// // // //       child: Row(
+// // // //         mainAxisAlignment: MainAxisAlignment.center,
+// // // //         children: [
+// // // //           // زر التعديل
+// // // //           IconButton(
+// // // //             icon: Container(
+// // // //               padding: const EdgeInsets.all(6),
+// // // //               decoration: BoxDecoration(
+// // // //                 color: Colors.blue.withOpacity(0.1),
+// // // //                 borderRadius: BorderRadius.circular(6),
+// // // //               ),
+// // // //               child: const Icon(Icons.edit, size: 16, color: Colors.blue),
+// // // //             ),
+// // // //             onPressed: onEdit,
+// // // //             padding: EdgeInsets.zero,
+// // // //             constraints: const BoxConstraints(),
+// // // //           ),
+// // // //           const SizedBox(width: 4),
+// // // //           // زر الحذف
+// // // //           IconButton(
+// // // //             icon: Container(
+// // // //               padding: const EdgeInsets.all(6),
+// // // //               decoration: BoxDecoration(
+// // // //                 color: Colors.red.withOpacity(0.1),
+// // // //                 borderRadius: BorderRadius.circular(6),
+// // // //               ),
+// // // //               child: const Icon(Icons.delete, size: 16, color: Colors.red),
+// // // //             ),
+// // // //             onPressed: onDelete,
+// // // //             padding: EdgeInsets.zero,
+// // // //             constraints: const BoxConstraints(),
+// // // //           ),
+// // // //         ],
+// // // //       ),
+// // // //     );
+// // // //   }
+// // // // }
+// // // import 'package:cloud_firestore/cloud_firestore.dart';
+// // // import 'package:flutter/material.dart';
+// // // import 'package:last/models/models.dart';
+// // // import 'package:printing/printing.dart';
+// // // import 'package:pdf/pdf.dart';
+// // // import 'package:pdf/widgets.dart' as pdfLib;
+// // // import 'package:intl/intl.dart';
+// // // import 'package:flutter/services.dart';
+// // // import 'package:flutter/widgets.dart' as t;
+
+// // // class PriceOffersListScreen extends StatefulWidget {
+// // //   const PriceOffersListScreen({super.key});
+
+// // //   @override
+// // //   State<PriceOffersListScreen> createState() => _PriceOffersListScreenState();
+// // // }
+
+// // // class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
+// // //   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+// // //   String _searchQuery = '';
+// // //   String _activeView = 'companies'; // 'companies' أو 'wheels'
+// // //   pdfLib.Font? _arabicFont;
+// // //   bool _isGeneratingPDF = false;
+// // //   String? _currentCompanyName;
+// // //   String? _currentViewType;
+// // //   String? _currentCompanyId;
+// // //   List<TransportationWithOffer>? _currentTransportations;
+
+// // //   // متغير لتتبع حالة الـ Switch (true: حفظ الأرقام برقم واحد بعد العلامة، false: تقريب لأسفل)
+// // //   bool _keepNumbersAsIs = true;
+
+// // //   // دالة مساعدة لتقريب الرقم إلى رقم واحد بعد العلامة العشرية
+// // //   double _roundToOneDecimal(double value) {
+// // //     return (value * 10).roundToDouble() / 10;
+// // //   }
+
+// // //   @override
+// // //   void initState() {
+// // //     super.initState();
+// // //     _loadArabicFont();
+// // //   }
+
+// // //   Future<void> _loadArabicFont() async {
+// // //     try {
+// // //       final fontData = await rootBundle.load(
+// // //         'assets/fonts/Amiri/Amiri-Regular.ttf',
+// // //       );
+
+// // //       _arabicFont = pdfLib.Font.ttf(fontData);
+// // //       debugPrint('تم تحميل الخط العربي بنجاح');
+// // //     } catch (e) {
+// // //       debugPrint('فشل تحميل الخط العربي: $e');
+// // //     }
+// // //   }
+
+// // //   @override
+// // //   Widget build(BuildContext context) {
+// // //     return Scaffold(
+// // //       backgroundColor: const Color(0xFFF4F6F8),
+// // //       body: SingleChildScrollView(
+// // //         child: Column(
+// // //           children: [
+// // //             _buildSearchAndStatsBar(),
+// // //             Padding(
+// // //               padding: const EdgeInsets.only(top: 8),
+// // //               child: SizedBox(
+// // //                 height: MediaQuery.of(context).size.height * 0.75,
+// // //                 child: _buildCompaniesWithOffersList(),
+// // //               ),
+// // //             ),
+// // //           ],
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   Widget _buildSearchAndStatsBar() {
+// // //     return Container(
+// // //       color: Colors.white,
+// // //       padding: const EdgeInsets.all(16),
+// // //       child: Column(
+// // //         children: [
+// // //           // شريط البحث
+// // //           Container(
+// // //             padding: const EdgeInsets.symmetric(horizontal: 16),
+// // //             decoration: BoxDecoration(
+// // //               color: const Color(0xFFF4F6F8),
+// // //               borderRadius: BorderRadius.circular(12),
+// // //               border: Border.all(color: const Color(0xFF3498DB), width: 1.5),
+// // //             ),
+// // //             child: Row(
+// // //               children: [
+// // //                 const Icon(Icons.search, color: Color(0xFF3498DB), size: 22),
+// // //                 const SizedBox(width: 12),
+// // //                 Expanded(
+// // //                   child: TextField(
+// // //                     onChanged: (value) => setState(() => _searchQuery = value),
+// // //                     decoration: const InputDecoration(
+// // //                       hintText: 'ابحث عن شركة...',
+// // //                       border: InputBorder.none,
+// // //                       hintStyle: TextStyle(color: Colors.grey),
+// // //                       contentPadding: EdgeInsets.symmetric(vertical: 12),
+// // //                     ),
+// // //                   ),
+// // //                 ),
+// // //                 if (_searchQuery.isNotEmpty)
+// // //                   GestureDetector(
+// // //                     onTap: () => setState(() => _searchQuery = ''),
+// // //                     child: const Icon(
+// // //                       Icons.clear,
+// // //                       size: 20,
+// // //                       color: Colors.grey,
+// // //                     ),
+// // //                   ),
+// // //               ],
+// // //             ),
+// // //           ),
+
+// // //           const SizedBox(height: 12),
+
+// // //           // الإحصائيات
+// // //           _buildStatsBar(),
+// // //         ],
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   Widget _buildStatsBar() {
+// // //     return StreamBuilder<QuerySnapshot>(
+// // //       stream: _firestore.collectionGroup('priceOffers').snapshots(),
+// // //       builder: (context, snapshot) {
+// // //         if (!snapshot.hasData) {
+// // //           return const SizedBox();
+// // //         }
+
+// // //         int totalCompanies = 0;
+// // //         int totalOffers = 0;
+// // //         int totalTrips = 0;
+
+// // //         // حساب الإحصائيات من البيانات الحالية
+// // //         final companiesData = _extractCompaniesData(snapshot.data!);
+// // //         totalCompanies = companiesData.length;
+
+// // //         for (final company in companiesData) {
+// // //           totalOffers += (company['totalOffers'] as num).toInt();
+// // //           totalTrips += (company['totalTrips'] as num).toInt();
+// // //         }
+// // //         return Row(
+// // //           children: [
+// // //             _buildStatCard('شركات', totalCompanies.toString(), Icons.business),
+// // //             const SizedBox(width: 12),
+// // //             _buildStatCard('عروض', totalTrips.toString(), Icons.description),
+// // //             const SizedBox(width: 12),
+// // //           ],
+// // //         );
+// // //       },
+// // //     );
+// // //   }
+
+// // //   List<Map<String, dynamic>> _extractCompaniesData(QuerySnapshot snapshot) {
+// // //     final Map<String, Map<String, dynamic>> companiesMap = {};
+
+// // //     for (final doc in snapshot.docs) {
+// // //       final data = doc.data() as Map<String, dynamic>;
+// // //       final companyId = _extractCompanyIdFromPath(doc.reference.path);
+// // //       final companyName = data['companyName'] ?? 'غير معروف';
+
+// // //       if (!companiesMap.containsKey(companyId)) {
+// // //         companiesMap[companyId] = {
+// // //           'companyId': companyId,
+// // //           'companyName': companyName,
+// // //           'totalOffers': 0,
+// // //           'totalTrips': 0,
+// // //         };
+// // //       }
+
+// // //       companiesMap[companyId]!['totalOffers']++;
+// // //       final transports = data['transportations'] as List? ?? [];
+// // //       companiesMap[companyId]!['totalTrips'] += transports.length;
+// // //     }
+
+// // //     return companiesMap.values.toList();
+// // //   }
+
+// // //   String _extractCompanyIdFromPath(String path) {
+// // //     final parts = path.split('/');
+// // //     return parts[1]; // companies/{companyId}/priceOffers/{offerId}
+// // //   }
+
+// // //   Widget _buildStatCard(String label, String value, IconData icon) {
+// // //     return Expanded(
+// // //       child: Container(
+// // //         padding: const EdgeInsets.all(12),
+// // //         decoration: BoxDecoration(
+// // //           color: const Color(0xFF3498DB).withOpacity(0.1),
+// // //           borderRadius: BorderRadius.circular(10),
+// // //           border: Border.all(color: const Color(0xFF3498DB), width: 1),
+// // //         ),
+// // //         child: Row(
+// // //           children: [
+// // //             Icon(icon, color: const Color(0xFF3498DB), size: 24),
+// // //             const SizedBox(width: 8),
+// // //             Expanded(
+// // //               child: Column(
+// // //                 crossAxisAlignment: CrossAxisAlignment.start,
+// // //                 children: [
+// // //                   Text(
+// // //                     label,
+// // //                     style: const TextStyle(
+// // //                       fontSize: 12,
+// // //                       color: Colors.grey,
+// // //                       fontWeight: FontWeight.w500,
+// // //                     ),
+// // //                   ),
+// // //                   Text(
+// // //                     value,
+// // //                     style: const TextStyle(
+// // //                       fontSize: 18,
+// // //                       fontWeight: FontWeight.bold,
+// // //                       color: Color(0xFF2C3E50),
+// // //                     ),
+// // //                   ),
+// // //                 ],
+// // //               ),
+// // //             ),
+// // //           ],
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   Widget _buildCompaniesWithOffersList() {
+// // //     return StreamBuilder<QuerySnapshot>(
+// // //       stream: _firestore.collectionGroup('priceOffers').snapshots(),
+// // //       builder: (context, snapshot) {
+// // //         if (snapshot.hasError) {
+// // //           return Center(
+// // //             child: Column(
+// // //               mainAxisAlignment: MainAxisAlignment.center,
+// // //               children: [
+// // //                 const Icon(Icons.error, size: 64, color: Colors.red),
+// // //                 const SizedBox(height: 16),
+// // //                 Text('خطأ: ${snapshot.error}', textAlign: TextAlign.center),
+// // //               ],
+// // //             ),
+// // //           );
+// // //         }
+
+// // //         if (snapshot.connectionState == ConnectionState.waiting) {
+// // //           return const Center(child: CircularProgressIndicator());
+// // //         }
+
+// // //         final companiesWithOffers = _extractCompaniesData(snapshot.data!);
+
+// // //         final filteredCompanies = companiesWithOffers.where((company) {
+// // //           if (_searchQuery.isEmpty) return true;
+// // //           final companyName =
+// // //               company['companyName']?.toString().toLowerCase() ?? '';
+// // //           return companyName.contains(_searchQuery.toLowerCase());
+// // //         }).toList();
+
+// // //         if (filteredCompanies.isEmpty) {
+// // //           return Center(
+// // //             child: Column(
+// // //               mainAxisAlignment: MainAxisAlignment.center,
+// // //               children: [
+// // //                 const Icon(Icons.business, size: 80, color: Colors.grey),
+// // //                 const SizedBox(height: 16),
+// // //                 const Text(
+// // //                   'لا توجد شركات لديها عروض أسعار',
+// // //                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+// // //                 ),
+// // //                 const SizedBox(height: 8),
+// // //                 Text(
+// // //                   _searchQuery.isEmpty
+// // //                       ? 'أضف عرض سعر جديد للبدء'
+// // //                       : 'لم يتم العثور على نتائج البحث',
+// // //                   style: const TextStyle(color: Colors.grey, fontSize: 14),
+// // //                 ),
+// // //               ],
+// // //             ),
+// // //           );
+// // //         }
+
+// // //         return ListView.builder(
+// // //           shrinkWrap: true,
+// // //           physics: const NeverScrollableScrollPhysics(),
+// // //           padding: const EdgeInsets.all(16),
+// // //           itemCount: filteredCompanies.length,
+// // //           itemBuilder: (context, index) {
+// // //             final companyData = filteredCompanies[index];
+// // //             return _buildCompanyWithAllOffersItem(companyData);
+// // //           },
+// // //         );
+// // //       },
+// // //     );
+// // //   }
+
+// // //   Widget _buildCompanyWithAllOffersItem(Map<String, dynamic> companyData) {
+// // //     final String companyName = companyData['companyName'];
+// // //     final String companyId = companyData['companyId'];
+// // //     final int totalOffers = companyData['totalOffers'];
+// // //     final int totalTrips = companyData['totalTrips'];
+
+// // //     return Container(
+// // //       margin: const EdgeInsets.only(bottom: 12),
+// // //       decoration: BoxDecoration(
+// // //         color: Colors.white,
+// // //         borderRadius: BorderRadius.circular(12),
+// // //         border: Border.all(color: const Color(0xFF3498DB).withOpacity(0.3)),
+// // //         boxShadow: [
+// // //           BoxShadow(
+// // //             color: Colors.black.withOpacity(0.05),
+// // //             blurRadius: 8,
+// // //             offset: const Offset(0, 2),
+// // //           ),
+// // //         ],
+// // //       ),
+// // //       child: ListTile(
+// // //         leading: Container(
+// // //           padding: const EdgeInsets.all(8),
+// // //           decoration: BoxDecoration(
+// // //             color: const Color(0xFF3498DB).withOpacity(0.1),
+// // //             borderRadius: BorderRadius.circular(8),
+// // //           ),
+// // //           child: const Icon(Icons.business, color: Color(0xFF3498DB), size: 24),
+// // //         ),
+// // //         title: Text(
+// // //           companyName,
+// // //           style: const TextStyle(
+// // //             fontSize: 16,
+// // //             fontWeight: FontWeight.bold,
+// // //             color: Color(0xFF2C3E50),
+// // //           ),
+// // //         ),
+// // //         subtitle: Text(
+// // //           '$totalTrips عروض السعر :',
+// // //           style: const TextStyle(fontSize: 12, color: Colors.grey),
+// // //         ),
+// // //         trailing: Row(
+// // //           mainAxisSize: MainAxisSize.min,
+// // //           children: [
+// // //             _buildActionButton(
+// // //               icon: Icons.business,
+// // //               label: 'الشركات',
+// // //               color: Colors.blue,
+// // //               onPressed: () {
+// // //                 setState(() => _activeView = 'companies');
+// // //                 _showAllCompanyOffers(companyId, companyName, 'companies');
+// // //               },
+// // //             ),
+// // //             const SizedBox(width: 8),
+// // //             _buildActionButton(
+// // //               icon: Icons.directions_bus,
+// // //               label: 'العجل',
+// // //               color: Colors.purple,
+// // //               onPressed: () {
+// // //                 setState(() => _activeView = 'wheels');
+// // //                 _showAllCompanyOffers(companyId, companyName, 'wheels');
+// // //               },
+// // //             ),
+// // //           ],
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   void _showAllCompanyOffers(
+// // //     String companyId,
+// // //     String companyName,
+// // //     String viewType,
+// // //   ) {
+// // //     _currentCompanyId = companyId;
+// // //     _currentCompanyName = companyName;
+// // //     _currentViewType = viewType;
+
+// // //     showDialog(
+// // //       context: context,
+// // //       builder: (context) => Directionality(
+// // //         textDirection: t.TextDirection.rtl,
+// // //         child: Dialog(
+// // //           backgroundColor: Colors.transparent,
+// // //           insetPadding: const EdgeInsets.all(16),
+// // //           child: Container(
+// // //             width: MediaQuery.of(context).size.width * 0.95,
+// // //             constraints: BoxConstraints(
+// // //               maxHeight: MediaQuery.of(context).size.height * 0.9,
+// // //             ),
+// // //             padding: const EdgeInsets.all(20),
+// // //             decoration: BoxDecoration(
+// // //               color: Colors.white,
+// // //               borderRadius: BorderRadius.circular(16),
+// // //               boxShadow: [
+// // //                 BoxShadow(
+// // //                   color: Colors.black.withOpacity(0.15),
+// // //                   blurRadius: 20,
+// // //                 ),
+// // //               ],
+// // //             ),
+// // //             child: Column(
+// // //               mainAxisSize: MainAxisSize.min,
+// // //               children: [
+// // //                 // العنوان
+// // //                 Row(
+// // //                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// // //                   children: [
+// // //                     Row(
+// // //                       mainAxisSize: MainAxisSize.min,
+// // //                       children: [
+// // //                         // زر الطباعة
+// // //                         IconButton(
+// // //                           icon: Icon(Icons.print, color: Colors.green[700]),
+// // //                           onPressed: () => _generatePDF(),
+// // //                         ),
+// // //                         // زر الإغلاق
+// // //                         IconButton(
+// // //                           icon: const Icon(Icons.close),
+// // //                           onPressed: () => Navigator.pop(context),
+// // //                         ),
+// // //                       ],
+// // //                     ),
+// // //                     Column(
+// // //                       children: [
+// // //                         Text(
+// // //                           viewType == 'companies'
+// // //                               ? 'عروض اسعار الشركات - $companyName'
+// // //                               : 'عروض اسعار العجل - $companyName',
+// // //                           style: const TextStyle(
+// // //                             fontSize: 20,
+// // //                             fontWeight: FontWeight.bold,
+// // //                             color: Color(0xFF2C3E50),
+// // //                           ),
+// // //                         ),
+// // //                         const SizedBox(height: 4),
+// // //                       ],
+// // //                     ),
+// // //                     const SizedBox(width: 48),
+// // //                   ],
+// // //                 ),
+
+// // //                 const SizedBox(height: 8),
+// // //                 Divider(color: const Color(0xFF3498DB).withOpacity(0.3)),
+
+// // //                 // إحصائيات الشركة
+// // //                 Container(
+// // //                   padding: const EdgeInsets.all(12),
+// // //                   decoration: BoxDecoration(
+// // //                     color: const Color(0xFF3498DB).withOpacity(0.1),
+// // //                     borderRadius: BorderRadius.circular(10),
+// // //                   ),
+// // //                   child: Row(
+// // //                     mainAxisAlignment: MainAxisAlignment.spaceAround,
+// // //                     children: [
+// // //                       Column(
+// // //                         children: [
+// // //                           const Text(
+// // //                             'اسم الشركة',
+// // //                             style: TextStyle(fontSize: 11, color: Colors.grey),
+// // //                           ),
+// // //                           Text(
+// // //                             companyName,
+// // //                             style: const TextStyle(
+// // //                               fontSize: 16,
+// // //                               fontWeight: FontWeight.bold,
+// // //                               color: Color(0xFF2C3E50),
+// // //                             ),
+// // //                           ),
+// // //                         ],
+// // //                       ),
+// // //                       Column(
+// // //                         children: [
+// // //                           const Text(
+// // //                             'إجمالي العروض',
+// // //                             style: TextStyle(fontSize: 11, color: Colors.grey),
+// // //                           ),
+// // //                           StreamBuilder<QuerySnapshot>(
+// // //                             stream: _firestore
+// // //                                 .collection('companies')
+// // //                                 .doc(companyId)
+// // //                                 .collection('priceOffers')
+// // //                                 .snapshots(),
+// // //                             builder: (context, snapshot) {
+// // //                               int totalTrips = 0;
+// // //                               if (snapshot.hasData) {
+// // //                                 for (final doc in snapshot.data!.docs) {
+// // //                                   final data =
+// // //                                       doc.data() as Map<String, dynamic>;
+// // //                                   final transports =
+// // //                                       data['transportations'] as List? ?? [];
+// // //                                   totalTrips += transports.length;
+// // //                                 }
+// // //                               }
+// // //                               return Text(
+// // //                                 '$totalTrips',
+// // //                                 style: const TextStyle(
+// // //                                   fontSize: 16,
+// // //                                   fontWeight: FontWeight.bold,
+// // //                                   color: Color(0xFF2C3E50),
+// // //                                 ),
+// // //                               );
+// // //                             },
+// // //                           ),
+// // //                         ],
+// // //                       ),
+// // //                     ],
+// // //                   ),
+// // //                 ),
+
+// // //                 const SizedBox(height: 16),
+
+// // //                 // الجدول
+// // //                 Expanded(child: _buildCompanyOffersTable(companyId, viewType)),
+
+// // //                 const SizedBox(height: 16),
+
+// // //                 // أزرار الإجراءات
+// // //                 Row(
+// // //                   mainAxisAlignment: MainAxisAlignment.center,
+// // //                   children: [
+// // //                     // زر رفع الأسعار
+// // //                     ElevatedButton(
+// // //                       onPressed: () => _showIncreasePricesDialog(viewType),
+// // //                       style: ElevatedButton.styleFrom(
+// // //                         backgroundColor: Colors.orange,
+// // //                         foregroundColor: Colors.white,
+// // //                         elevation: 2,
+// // //                         padding: const EdgeInsets.symmetric(
+// // //                           horizontal: 30,
+// // //                           vertical: 12,
+// // //                         ),
+// // //                         shape: RoundedRectangleBorder(
+// // //                           borderRadius: BorderRadius.circular(8),
+// // //                         ),
+// // //                       ),
+// // //                       child: Row(
+// // //                         children: [
+// // //                           Icon(
+// // //                             Icons.trending_up,
+// // //                             color: const Color.fromARGB(255, 255, 255, 255),
+// // //                           ),
+// // //                           const SizedBox(width: 8),
+// // //                           const Text('رفع الأسعار'),
+// // //                         ],
+// // //                       ),
+// // //                     ),
+// // //                     const SizedBox(width: 10),
+
+// // //                     // زر الطباعة
+// // //                     ElevatedButton(
+// // //                       onPressed: () => _generatePDF(),
+// // //                       style: ElevatedButton.styleFrom(
+// // //                         backgroundColor: Colors.green,
+// // //                         foregroundColor: Colors.white,
+// // //                         elevation: 2,
+// // //                         padding: const EdgeInsets.symmetric(
+// // //                           horizontal: 30,
+// // //                           vertical: 12,
+// // //                         ),
+// // //                         shape: RoundedRectangleBorder(
+// // //                           borderRadius: BorderRadius.circular(8),
+// // //                         ),
+// // //                       ),
+// // //                       child: Row(
+// // //                         children: [
+// // //                           Icon(
+// // //                             Icons.print,
+// // //                             color: const Color.fromARGB(255, 255, 255, 255),
+// // //                           ),
+// // //                           const SizedBox(width: 8),
+// // //                           const Text('طباعة'),
+// // //                         ],
+// // //                       ),
+// // //                     ),
+// // //                     const SizedBox(width: 10),
+
+// // //                     // زر الإغلاق
+// // //                     ElevatedButton(
+// // //                       onPressed: () => Navigator.pop(context),
+// // //                       style: ElevatedButton.styleFrom(
+// // //                         backgroundColor: const Color(0xFF3498DB),
+// // //                         foregroundColor: Colors.white,
+// // //                         elevation: 2,
+// // //                         padding: const EdgeInsets.symmetric(
+// // //                           horizontal: 40,
+// // //                           vertical: 12,
+// // //                         ),
+// // //                         shape: RoundedRectangleBorder(
+// // //                           borderRadius: BorderRadius.circular(8),
+// // //                         ),
+// // //                       ),
+// // //                       child: const Text('إغلاق'),
+// // //                     ),
+// // //                   ],
+// // //                 ),
+// // //               ],
+// // //             ),
+// // //           ),
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // عرض نافذة رفع الأسعار
+// // //   void _showIncreasePricesDialog(String viewType) {
+// // //     final TextEditingController percentageController = TextEditingController();
+// // //     bool keepNumbersAsIs =
+// // //         _keepNumbersAsIs; // القيمة الافتراضية من المتغير العام
+
+// // //     showDialog(
+// // //       context: context,
+// // //       builder: (context) => Directionality(
+// // //         textDirection: t.TextDirection.rtl,
+// // //         child: StatefulBuilder(
+// // //           builder: (context, setState) {
+// // //             return AlertDialog(
+// // //               backgroundColor: Colors.white,
+// // //               shape: RoundedRectangleBorder(
+// // //                 borderRadius: BorderRadius.circular(16),
+// // //               ),
+// // //               title: Row(
+// // //                 children: [
+// // //                   Icon(Icons.trending_up, color: Colors.orange[700]),
+// // //                   const SizedBox(width: 8),
+// // //                   Text(
+// // //                     viewType == 'companies'
+// // //                         ? 'رفع أسعار الشركات'
+// // //                         : 'رفع أسعار العجل',
+// // //                     style: const TextStyle(
+// // //                       fontWeight: FontWeight.bold,
+// // //                       color: Color(0xFF2C3E50),
+// // //                     ),
+// // //                   ),
+// // //                 ],
+// // //               ),
+// // //               content: Column(
+// // //                 mainAxisSize: MainAxisSize.min,
+// // //                 crossAxisAlignment: CrossAxisAlignment.start,
+// // //                 children: [
+// // //                   Text(
+// // //                     viewType == 'companies'
+// // //                         ? 'سيتم رفع أسعار النولون، المبيت، والعطلة لجميع عروض الشركات بنسبة:'
+// // //                         : 'سيتم رفع أسعار النولون، المبيت، والعطلة لجميع عروض العجل بنسبة:',
+// // //                     style: const TextStyle(fontSize: 14),
+// // //                   ),
+// // //                   const SizedBox(height: 16),
+// // //                   TextFormField(
+// // //                     controller: percentageController,
+// // //                     keyboardType: TextInputType.number,
+// // //                     decoration: InputDecoration(
+// // //                       hintText: 'أدخل النسبة المؤوية (مثال: 10)',
+// // //                       prefixIcon: const Icon(
+// // //                         Icons.percent,
+// // //                         color: Color(0xFF3498DB),
+// // //                       ),
+// // //                       filled: true,
+// // //                       fillColor: const Color(0xFFF4F6F8),
+// // //                       border: OutlineInputBorder(
+// // //                         borderRadius: BorderRadius.circular(8),
+// // //                         borderSide: BorderSide.none,
+// // //                       ),
+// // //                       contentPadding: const EdgeInsets.symmetric(
+// // //                         horizontal: 16,
+// // //                         vertical: 12,
+// // //                       ),
+// // //                     ),
+// // //                   ),
+// // //                   const SizedBox(height: 16),
+
+// // //                   // ✅ إضافة الـ Switch للتحكم في طريقة حفظ الأرقام
+// // //                   Container(
+// // //                     padding: const EdgeInsets.all(12),
+// // //                     decoration: BoxDecoration(
+// // //                       color: const Color(0xFFF4F6F8),
+// // //                       borderRadius: BorderRadius.circular(8),
+// // //                       border: Border.all(
+// // //                         color: const Color(0xFF3498DB).withOpacity(0.3),
+// // //                       ),
+// // //                     ),
+// // //                     child: Row(
+// // //                       children: [
+// // //                         Icon(
+// // //                           Icons.circle,
+// // //                           size: 12,
+// // //                           color: keepNumbersAsIs ? Colors.green : Colors.orange,
+// // //                         ),
+// // //                         const SizedBox(width: 12),
+// // //                         Expanded(
+// // //                           child: Column(
+// // //                             crossAxisAlignment: CrossAxisAlignment.start,
+// // //                             children: [
+// // //                               const Text(
+// // //                                 'طريقة حفظ الأرقام',
+// // //                                 style: TextStyle(
+// // //                                   fontWeight: FontWeight.bold,
+// // //                                   fontSize: 14,
+// // //                                 ),
+// // //                               ),
+// // //                               const SizedBox(height: 2),
+// // //                               Text(
+// // //                                 keepNumbersAsIs
+// // //                                     ? '✅ (10.5)زياده مع وجود كسور'
+// // //                                     : '⬇️ (10)زياده مع الغاء كسور',
+// // //                                 style: TextStyle(
+// // //                                   fontSize: 11,
+// // //                                   color: keepNumbersAsIs
+// // //                                       ? Colors.green[700]
+// // //                                       : Colors.orange[700],
+// // //                                   fontWeight: FontWeight.w500,
+// // //                                 ),
+// // //                               ),
+// // //                               const SizedBox(height: 4),
+// // //                               Text(
+// // //                                 keepNumbersAsIs
+// // //                                     ? 'مثال: = 11.6 → 11.606'
+// // //                                     : 'مثال:= 11 → 11.51',
+// // //                                 style: TextStyle(
+// // //                                   fontSize: 10,
+// // //                                   color: Colors.grey[600],
+// // //                                   fontStyle: FontStyle.italic,
+// // //                                 ),
+// // //                               ),
+// // //                             ],
+// // //                           ),
+// // //                         ),
+// // //                         Switch(
+// // //                           value: keepNumbersAsIs,
+// // //                           onChanged: (value) {
+// // //                             setState(() {
+// // //                               keepNumbersAsIs = value;
+// // //                             });
+// // //                           },
+// // //                           activeColor: Colors.green,
+// // //                           inactiveThumbColor: Colors.orange,
+// // //                           inactiveTrackColor: Colors.orange.withOpacity(0.5),
+// // //                         ),
+// // //                       ],
+// // //                     ),
+// // //                   ),
+
+// // //                   const SizedBox(height: 8),
+// // //                   const Text(
+// // //                     'ملاحظة: سيتم تطبيق الزيادة على جميع الأسعار الحالية',
+// // //                     style: TextStyle(fontSize: 12, color: Colors.grey),
+// // //                   ),
+// // //                 ],
+// // //               ),
+// // //               actions: [
+// // //                 TextButton(
+// // //                   onPressed: () => Navigator.pop(context),
+// // //                   child: const Text(
+// // //                     'إلغاء',
+// // //                     style: TextStyle(color: Color(0xFF2C3E50)),
+// // //                   ),
+// // //                 ),
+// // //                 ElevatedButton(
+// // //                   onPressed: () async {
+// // //                     final percentage = double.tryParse(
+// // //                       percentageController.text,
+// // //                     );
+// // //                     if (percentage == null || percentage <= 0) {
+// // //                       ScaffoldMessenger.of(context).showSnackBar(
+// // //                         const SnackBar(
+// // //                           content: Text('الرجاء إدخال نسبة صحيحة أكبر من صفر'),
+// // //                           backgroundColor: Colors.red,
+// // //                         ),
+// // //                       );
+// // //                       return;
+// // //                     }
+
+// // //                     Navigator.pop(context);
+
+// // //                     // ✅ تحديث الحالة العامة وتنفيذ رفع الأسعار مع خيار حفظ الأرقام
+// // //                     setState(() {
+// // //                       _keepNumbersAsIs = keepNumbersAsIs;
+// // //                     });
+
+// // //                     await _increasePrices(
+// // //                       percentage,
+// // //                       viewType,
+// // //                       keepNumbersAsIs,
+// // //                     );
+// // //                   },
+// // //                   style: ElevatedButton.styleFrom(
+// // //                     backgroundColor: Colors.orange,
+// // //                     foregroundColor: Colors.white,
+// // //                   ),
+// // //                   child: const Text('رفع الأسعار'),
+// // //                 ),
+// // //               ],
+// // //             );
+// // //           },
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // دالة رفع الأسعار
+// // //   Future<void> _increasePrices(
+// // //     double percentage,
+// // //     String viewType,
+// // //     bool keepNumbersAsIs,
+// // //   ) async {
+// // //     try {
+// // //       if (_currentCompanyId == null) return;
+
+// // //       setState(() => _isGeneratingPDF = true);
+
+// // //       final percentageFactor = 1 + (percentage / 100);
+
+// // //       // جلب جميع العروض
+// // //       final offersSnapshot = await _firestore
+// // //           .collection('companies')
+// // //           .doc(_currentCompanyId!)
+// // //           .collection('priceOffers')
+// // //           .get();
+
+// // //       // تحديث كل عرض
+// // //       for (final offerDoc in offersSnapshot.docs) {
+// // //         final offerData = offerDoc.data();
+// // //         final List<dynamic> transportations = List.from(
+// // //           offerData['transportations'] ?? [],
+// // //         );
+
+// // //         // تحديث كل رحلة في العرض
+// // //         final updatedTransportations = transportations.map((transport) {
+// // //           final Map<String, dynamic> updatedTransport =
+// // //               Map<String, dynamic>.from(transport);
+
+// // //           if (viewType == 'companies') {
+// // //             // رفع أسعار الشركات
+// // //             if (updatedTransport['nolon'] != null) {
+// // //               double value =
+// // //                   (updatedTransport['nolon'] as num) * percentageFactor;
+// // //               // ✅ تقريب الرقم إلى رقم واحد بعد العلامة العشرية
+// // //               double roundedValue = _roundToOneDecimal(value);
+// // //               updatedTransport['nolon'] = keepNumbersAsIs
+// // //                   ? roundedValue
+// // //                   : value.floor().toDouble();
+// // //             }
+// // //             if (updatedTransport['companyOvernight'] != null) {
+// // //               double value =
+// // //                   (updatedTransport['companyOvernight'] as num) *
+// // //                   percentageFactor;
+// // //               double roundedValue = _roundToOneDecimal(value);
+// // //               updatedTransport['companyOvernight'] = keepNumbersAsIs
+// // //                   ? roundedValue
+// // //                   : value.floor().toDouble();
+// // //             }
+// // //             if (updatedTransport['companyHoliday'] != null) {
+// // //               double value =
+// // //                   (updatedTransport['companyHoliday'] as num) *
+// // //                   percentageFactor;
+// // //               double roundedValue = _roundToOneDecimal(value);
+// // //               updatedTransport['companyHoliday'] = keepNumbersAsIs
+// // //                   ? roundedValue
+// // //                   : value.floor().toDouble();
+// // //             }
+// // //           } else {
+// // //             // رفع أسعار العجل
+// // //             if (updatedTransport['wheelNolon'] != null) {
+// // //               double value =
+// // //                   (updatedTransport['wheelNolon'] as num) * percentageFactor;
+// // //               double roundedValue = _roundToOneDecimal(value);
+// // //               updatedTransport['wheelNolon'] = keepNumbersAsIs
+// // //                   ? roundedValue
+// // //                   : value.floor().toDouble();
+// // //             }
+// // //             if (updatedTransport['wheelOvernight'] != null) {
+// // //               double value =
+// // //                   (updatedTransport['wheelOvernight'] as num) *
+// // //                   percentageFactor;
+// // //               double roundedValue = _roundToOneDecimal(value);
+// // //               updatedTransport['wheelOvernight'] = keepNumbersAsIs
+// // //                   ? roundedValue
+// // //                   : value.floor().toDouble();
+// // //             }
+// // //             if (updatedTransport['wheelHoliday'] != null) {
+// // //               double value =
+// // //                   (updatedTransport['wheelHoliday'] as num) * percentageFactor;
+// // //               double roundedValue = _roundToOneDecimal(value);
+// // //               updatedTransport['wheelHoliday'] = keepNumbersAsIs
+// // //                   ? roundedValue
+// // //                   : value.floor().toDouble();
+// // //             }
+// // //           }
+
+// // //           return updatedTransport;
+// // //         }).toList();
+
+// // //         // تحديث العرض في Firebase
+// // //         await offerDoc.reference.update({
+// // //           'transportations': updatedTransportations,
+// // //           'updatedAt': Timestamp.now(),
+// // //         });
+// // //       }
+
+// // //       if (mounted) {
+// // //         ScaffoldMessenger.of(context).showSnackBar(
+// // //           SnackBar(
+// // //             content: Text(
+// // //               'تم رفع الأسعار بنسبة ${percentage.toStringAsFixed(2)}% بنجاح' +
+// // //                   (keepNumbersAsIs
+// // //                       ? ' (تم حفظ الأرقام برقم واحد بعد العلامة)'
+// // //                       : ' (تم تقريب الأرقام لأسفل)'),
+// // //             ),
+// // //             backgroundColor: Colors.green,
+// // //             duration: const Duration(seconds: 3),
+// // //           ),
+// // //         );
+// // //       }
+// // //     } catch (e) {
+// // //       print('Error increasing prices: $e');
+// // //       if (mounted) {
+// // //         ScaffoldMessenger.of(context).showSnackBar(
+// // //           SnackBar(
+// // //             content: Text('خطأ في رفع الأسعار: $e'),
+// // //             backgroundColor: Colors.red,
+// // //             duration: const Duration(seconds: 3),
+// // //           ),
+// // //         );
+// // //       }
+// // //     } finally {
+// // //       setState(() => _isGeneratingPDF = false);
+// // //     }
+// // //   }
+
+// // //   Widget _buildCompanyOffersTable(String companyId, String viewType) {
+// // //     return StreamBuilder<QuerySnapshot>(
+// // //       stream: _firestore
+// // //           .collection('companies')
+// // //           .doc(companyId)
+// // //           .collection('priceOffers')
+// // //           .orderBy('updatedAt', descending: true)
+// // //           .snapshots(),
+// // //       builder: (context, snapshot) {
+// // //         if (snapshot.connectionState == ConnectionState.waiting) {
+// // //           return const Center(child: CircularProgressIndicator());
+// // //         }
+
+// // //         if (snapshot.hasError) {
+// // //           return Center(
+// // //             child: Column(
+// // //               mainAxisAlignment: MainAxisAlignment.center,
+// // //               children: [
+// // //                 const Icon(Icons.error, size: 48, color: Colors.red),
+// // //                 const SizedBox(height: 8),
+// // //                 Text(
+// // //                   'خطأ في تحميل البيانات: ${snapshot.error}',
+// // //                   textAlign: TextAlign.center,
+// // //                   style: const TextStyle(fontSize: 14, color: Colors.red),
+// // //                 ),
+// // //               ],
+// // //             ),
+// // //           );
+// // //         }
+
+// // //         final offers = snapshot.data!.docs.map((doc) {
+// // //           final data = doc.data() as Map<String, dynamic>;
+// // //           return PriceOffer.fromMap(data, doc.id);
+// // //         }).toList();
+
+// // //         if (offers.isEmpty) {
+// // //           return const Center(
+// // //             child: Column(
+// // //               mainAxisAlignment: MainAxisAlignment.center,
+// // //               children: [
+// // //                 Icon(Icons.description, size: 64, color: Colors.grey),
+// // //                 SizedBox(height: 16),
+// // //                 Text(
+// // //                   'لا توجد عروض أسعار',
+// // //                   style: TextStyle(fontSize: 16, color: Colors.grey),
+// // //                 ),
+// // //               ],
+// // //             ),
+// // //           );
+// // //         }
+
+// // //         // جمع كل الرحلات من كل العروض
+// // //         List<TransportationWithOffer> allTransportations = [];
+// // //         for (final offer in offers) {
+// // //           for (final transport in offer.transportations) {
+// // //             allTransportations.add(
+// // //               TransportationWithOffer(
+// // //                 transportation: transport,
+// // //                 offerId: offer.id,
+// // //                 companyId: companyId,
+// // //                 offer: offer,
+// // //               ),
+// // //             );
+// // //           }
+// // //         }
+
+// // //         // حفظ البيانات للطباعة
+// // //         _currentTransportations = allTransportations;
+
+// // //         return viewType == 'companies'
+// // //             ? _buildCompaniesTable(allTransportations)
+// // //             : _buildWheelsTable(allTransportations);
+// // //       },
+// // //     );
+// // //   }
+
+// // //   // ================= إنشاء PDF =================
+// // //   Future<void> _generatePDF() async {
+// // //     if (_arabicFont == null) {
+// // //       ScaffoldMessenger.of(
+// // //         context,
+// // //       ).showSnackBar(const SnackBar(content: Text('الخط العربي غير محمل')));
+// // //       return;
+// // //     }
+
+// // //     if (_currentCompanyName == null ||
+// // //         _currentViewType == null ||
+// // //         _currentTransportations == null) {
+// // //       ScaffoldMessenger.of(
+// // //         context,
+// // //       ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للطباعة')));
+// // //       return;
+// // //     }
+
+// // //     setState(() => _isGeneratingPDF = true);
+
+// // //     try {
+// // //       // إنشاء PDF
+// // //       final pdf = pdfLib.Document(
+// // //         theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
+// // //       );
+
+// // //       // تقسيم البيانات إلى صفحات (25 صف لكل صفحة)
+// // //       final pages = _splitDataIntoPages(_currentTransportations!);
+
+// // //       for (int pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+// // //         pdf.addPage(
+// // //           pdfLib.Page(
+// // //             pageFormat: PdfPageFormat.a4,
+// // //             margin: pdfLib.EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+// // //             build: (context) {
+// // //               return pdfLib.Column(
+// // //                 crossAxisAlignment: pdfLib.CrossAxisAlignment.stretch,
+// // //                 children: [
+// // //                   // 1. الهيدر - أعلى الصفحة مباشرة
+// // //                   _buildPdfHeader(),
+// // //                   pdfLib.SizedBox(height: 10),
+
+// // //                   // 2. العنوان
+// // //                   _buildPdfTitle(),
+// // //                   pdfLib.SizedBox(height: 10),
+
+// // //                   // 3. إحصائيات العدد
+// // //                   _buildPdfStats(_currentTransportations!.length),
+// // //                   pdfLib.SizedBox(height: 10),
+
+// // //                   // 4. الجدول - يأخذ المساحة المتبقية
+// // //                   pdfLib.Expanded(
+// // //                     child: _currentViewType == 'companies'
+// // //                         ? _buildCompaniesPdfTablePage(
+// // //                             pages[pageIndex],
+// // //                             pageIndex,
+// // //                           )
+// // //                         : _buildWheelsPdfTablePage(pages[pageIndex], pageIndex),
+// // //                   ),
+
+// // //                   // 5. رقم الصفحة (إذا كان هناك أكثر من صفحة)
+// // //                   if (pages.length > 1) pdfLib.SizedBox(height: 15),
+// // //                   if (pages.length > 1)
+// // //                     _buildPageNumber(pageIndex + 1, pages.length),
+// // //                 ],
+// // //               );
+// // //             },
+// // //           ),
+// // //         );
+// // //       }
+
+// // //       // طباعة PDF
+// // //       await Printing.layoutPdf(
+// // //         onLayout: (PdfPageFormat format) async => pdf.save(),
+// // //         name: _getPDFFileName(),
+// // //       );
+// // //     } catch (e) {
+// // //       ScaffoldMessenger.of(
+// // //         context,
+// // //       ).showSnackBar(SnackBar(content: Text('حدث خطأ في إنشاء PDF: $e')));
+// // //     } finally {
+// // //       setState(() => _isGeneratingPDF = false);
+// // //     }
+// // //   }
+
+// // //   // ================= تقسيم البيانات إلى صفحات =================
+// // //   List<List<TransportationWithOffer>> _splitDataIntoPages(
+// // //     List<TransportationWithOffer> transportations,
+// // //   ) {
+// // //     List<List<TransportationWithOffer>> pages = [];
+// // //     List<TransportationWithOffer> currentPage = [];
+
+// // //     // حوالي 25-30 صف لكل صفحة A4
+// // //     int rowsPerPage = 25;
+
+// // //     for (int i = 0; i < transportations.length; i++) {
+// // //       currentPage.add(transportations[i]);
+
+// // //       // إذا وصلنا إلى العدد المحدد أو كانت آخر دفعة
+// // //       if ((i + 1) % rowsPerPage == 0 || i == transportations.length - 1) {
+// // //         pages.add(List.from(currentPage));
+// // //         currentPage.clear();
+// // //       }
+// // //     }
+
+// // //     return pages;
+// // //   }
+
+// // //   // ================= بناء الهيدر =================
+// // //   pdfLib.Widget _buildPdfHeader() {
+// // //     return pdfLib.Directionality(
+// // //       textDirection: pdfLib.TextDirection.rtl,
+// // //       child: pdfLib.Row(
+// // //         mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+// // //         children: [
+// // //           pdfLib.Text(
+// // //             'FM 454.4 - 203/317/21',
+// // //             style: pdfLib.TextStyle(
+// // //               fontSize: 12,
+// // //               fontWeight: pdfLib.FontWeight.bold,
+// // //               font: _arabicFont,
+// // //             ),
+// // //           ),
+// // //           pdfLib.Text(
+// // //             _currentViewType == 'companies'
+// // //                 ? 'عروض أسعار الشركات'
+// // //                 : 'عروض أسعار العجل',
+// // //             style: pdfLib.TextStyle(
+// // //               fontSize: 18,
+// // //               fontWeight: pdfLib.FontWeight.bold,
+// // //               font: _arabicFont,
+// // //             ),
+// // //           ),
+// // //         ],
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // ================= بناء العنوان =================
+// // //   pdfLib.Widget _buildPdfTitle() {
+// // //     return pdfLib.Directionality(
+// // //       textDirection: pdfLib.TextDirection.rtl,
+// // //       child: pdfLib.Column(
+// // //         children: [
+// // //           pdfLib.Text(
+// // //             _currentCompanyName!,
+// // //             style: pdfLib.TextStyle(
+// // //               fontSize: 16,
+// // //               fontWeight: pdfLib.FontWeight.bold,
+// // //               font: _arabicFont,
+// // //             ),
+// // //             textAlign: pdfLib.TextAlign.center,
+// // //           ),
+// // //           pdfLib.SizedBox(height: 5),
+// // //           pdfLib.Text(
+// // //             'تاريخ الطباعة: ${DateFormat('yyyy/MM/dd').format(DateTime.now())}',
+// // //             style: pdfLib.TextStyle(fontSize: 11, font: _arabicFont),
+// // //           ),
+// // //         ],
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // ================= بناء الإحصائيات =================
+// // //   pdfLib.Widget _buildPdfStats(int total) {
+// // //     return pdfLib.Directionality(
+// // //       textDirection: pdfLib.TextDirection.rtl,
+// // //       child: pdfLib.Container(
+// // //         padding: pdfLib.EdgeInsets.all(8),
+// // //         decoration: pdfLib.BoxDecoration(
+// // //           border: pdfLib.Border.all(color: PdfColors.black, width: 1.5),
+// // //         ),
+// // //         child: pdfLib.Row(
+// // //           mainAxisAlignment: pdfLib.MainAxisAlignment.spaceBetween,
+// // //           children: [
+// // //             pdfLib.Text(
+// // //               'إجمالي العروض',
+// // //               style: pdfLib.TextStyle(
+// // //                 fontSize: 14,
+// // //                 fontWeight: pdfLib.FontWeight.bold,
+// // //                 font: _arabicFont,
+// // //               ),
+// // //             ),
+// // //             pdfLib.Text(
+// // //               '$total',
+// // //               style: pdfLib.TextStyle(
+// // //                 fontSize: 16,
+// // //                 fontWeight: pdfLib.FontWeight.bold,
+// // //                 font: _arabicFont,
+// // //               ),
+// // //             ),
+// // //           ],
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // ================= بناء جدول الشركات للصفحة =================
+// // //   pdfLib.Widget _buildCompaniesPdfTablePage(
+// // //     List<TransportationWithOffer> transportations,
+// // //     int pageIndex,
+// // //   ) {
+// // //     return pdfLib.Directionality(
+// // //       textDirection: pdfLib.TextDirection.rtl,
+// // //       child: pdfLib.Table(
+// // //         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
+// // //         columnWidths: {
+// // //           6: pdfLib.FlexColumnWidth(0.4), // م
+// // //           5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
+// // //           4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
+// // //           3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
+// // //           2: pdfLib.FlexColumnWidth(1.0), // النولون
+// // //           1: pdfLib.FlexColumnWidth(1.0), // المبيت
+// // //           0: pdfLib.FlexColumnWidth(1.0), // العطلة
+// // //         },
+// // //         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
+// // //         children: [
+// // //           // رأس الجدول
+// // //           pdfLib.TableRow(
+// // //             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
+// // //             children: [
+// // //               _buildCompactHeaderCell('العطلة'),
+// // //               _buildCompactHeaderCell('المبيت'),
+// // //               _buildCompactHeaderCell('النولون'),
+// // //               _buildCompactHeaderCell('نوع العربية'),
+// // //               _buildCompactHeaderCell('مكان التعتيق'),
+// // //               _buildCompactHeaderCell('مكان التحميل'),
+// // //               _buildCompactHeaderCell('م'),
+// // //             ],
+// // //           ),
+
+// // //           // بيانات الجدول
+// // //           ...transportations.asMap().entries.map((entry) {
+// // //             int index = (pageIndex * 25) + entry.key + 1;
+// // //             final item = entry.value;
+// // //             final transport = item.transportation;
+
+// // //             return pdfLib.TableRow(
+// // //               decoration: entry.key % 2 == 0
+// // //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
+// // //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
+// // //               children: [
+// // //                 _buildCompactDataCell(
+// // //                   '${_formatPdfNumber(transport.companyHoliday)}',
+// // //                 ),
+// // //                 _buildCompactDataCell(
+// // //                   '${_formatPdfNumber(transport.companyOvernight)}',
+// // //                 ),
+// // //                 _buildCompactDataCell('${_formatPdfNumber(transport.nolon)}'),
+// // //                 _buildCompactDataCell(transport.vehicleType),
+// // //                 _buildCompactDataCell(transport.unloadingLocation),
+// // //                 _buildCompactDataCell(transport.loadingLocation),
+// // //                 _buildCompactDataCell(index.toString()),
+// // //               ],
+// // //             );
+// // //           }),
+// // //         ],
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // ================= بناء جدول العجل للصفحة =================
+// // //   pdfLib.Widget _buildWheelsPdfTablePage(
+// // //     List<TransportationWithOffer> transportations,
+// // //     int pageIndex,
+// // //   ) {
+// // //     return pdfLib.Directionality(
+// // //       textDirection: pdfLib.TextDirection.rtl,
+// // //       child: pdfLib.Table(
+// // //         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
+// // //         columnWidths: {
+// // //           6: pdfLib.FlexColumnWidth(0.4), // م
+// // //           5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
+// // //           4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
+// // //           3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
+// // //           2: pdfLib.FlexColumnWidth(1.0), // النولون
+// // //           1: pdfLib.FlexColumnWidth(1.0), // المبيت
+// // //           0: pdfLib.FlexColumnWidth(1.0), // العطلة
+// // //         },
+// // //         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
+// // //         children: [
+// // //           // رأس الجدول
+// // //           pdfLib.TableRow(
+// // //             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
+// // //             children: [
+// // //               _buildCompactHeaderCell('العطلة'),
+// // //               _buildCompactHeaderCell('المبيت'),
+// // //               _buildCompactHeaderCell('النولون'),
+// // //               _buildCompactHeaderCell('نوع العربية'),
+// // //               _buildCompactHeaderCell('مكان التعتيق'),
+// // //               _buildCompactHeaderCell('مكان التحميل'),
+// // //               _buildCompactHeaderCell('م'),
+// // //             ],
+// // //           ),
+
+// // //           // بيانات الجدول
+// // //           ...transportations.asMap().entries.map((entry) {
+// // //             int index = (pageIndex * 25) + entry.key + 1;
+// // //             final item = entry.value;
+// // //             final transport = item.transportation;
+
+// // //             return pdfLib.TableRow(
+// // //               decoration: entry.key % 2 == 0
+// // //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
+// // //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
+// // //               children: [
+// // //                 _buildCompactDataCell(
+// // //                   '${_formatPdfNumber(transport.wheelHoliday)}',
+// // //                 ),
+// // //                 _buildCompactDataCell(
+// // //                   '${_formatPdfNumber(transport.wheelOvernight)}',
+// // //                 ),
+// // //                 _buildCompactDataCell(
+// // //                   '${_formatPdfNumber(transport.wheelNolon)}',
+// // //                 ),
+// // //                 _buildCompactDataCell(transport.vehicleType),
+// // //                 _buildCompactDataCell(transport.unloadingLocation),
+// // //                 _buildCompactDataCell(transport.loadingLocation),
+// // //                 _buildCompactDataCell(index.toString()),
+// // //               ],
+// // //             );
+// // //           }),
+// // //         ],
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // دالة لتنسيق الأرقام في PDF برقم واحد بعد العلامة العشرية
+// // //   String _formatPdfNumber(double? number) {
+// // //     if (number == null) return '0';
+
+// // //     // إذا كان الرقم صحيحًا
+// // //     if (number == number.roundToDouble()) {
+// // //       return number.round().toString();
+// // //     }
+
+// // //     // عرض برقم واحد بعد العلامة العشرية
+// // //     return number.toStringAsFixed(1);
+// // //   }
+
+// // //   // ================= بناء خلية رأس مضغوطة =================
+// // //   pdfLib.Widget _buildCompactHeaderCell(String text) {
+// // //     return pdfLib.Container(
+// // //       padding: pdfLib.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+// // //       child: pdfLib.Text(
+// // //         text,
+// // //         style: pdfLib.TextStyle(
+// // //           fontSize: 11,
+// // //           fontWeight: pdfLib.FontWeight.bold,
+// // //           font: _arabicFont,
+// // //           color: PdfColors.black,
+// // //         ),
+// // //         textAlign: pdfLib.TextAlign.center,
+// // //         maxLines: 2,
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // ================= بناء خلية بيانات مضغوطة =================
+// // //   pdfLib.Widget _buildCompactDataCell(String text) {
+// // //     return pdfLib.Container(
+// // //       padding: pdfLib.EdgeInsets.symmetric(vertical: 5, horizontal: 3),
+// // //       child: pdfLib.Text(
+// // //         text,
+// // //         style: pdfLib.TextStyle(
+// // //           fontSize: 10,
+// // //           font: _arabicFont,
+// // //           color: PdfColors.black,
+// // //         ),
+// // //         textAlign: pdfLib.TextAlign.center,
+// // //         maxLines: 2,
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // ================= بناء رقم الصفحة =================
+// // //   pdfLib.Widget _buildPageNumber(int currentPage, int totalPages) {
+// // //     return pdfLib.Directionality(
+// // //       textDirection: pdfLib.TextDirection.rtl,
+// // //       child: pdfLib.Container(
+// // //         alignment: pdfLib.Alignment.center,
+// // //         child: pdfLib.Text(
+// // //           'الصفحة $currentPage من $totalPages',
+// // //           style: pdfLib.TextStyle(
+// // //             fontSize: 10,
+// // //             font: _arabicFont,
+// // //             color: PdfColors.grey600,
+// // //           ),
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // ================= الحصول على اسم الملف =================
+// // //   String _getPDFFileName() {
+// // //     final now = DateTime.now();
+// // //     final formattedDate = DateFormat('yyyyMMdd').format(now);
+// // //     final viewTypeText = _currentViewType == 'companies' ? 'شركات' : 'عجل';
+// // //     return 'عروض_اسعار_${viewTypeText}_${_currentCompanyName}_$formattedDate';
+// // //   }
+
+// // //   // دالة لتنسيق الأرقام برقم واحد بعد العلامة العشرية
+// // //   String _formatNumber(double? number) {
+// // //     if (number == null) return '0';
+
+// // //     // إذا كان الرقم صحيحًا (بدون كسور)
+// // //     if (number == number.roundToDouble()) {
+// // //       return number.round().toString();
+// // //     }
+
+// // //     // تقريب الرقم إلى رقم واحد بعد العلامة العشرية للعرض فقط
+// // //     return number.toStringAsFixed(1);
+// // //   }
+
+// // //   Widget _buildCompaniesTable(List<TransportationWithOffer> transportations) {
+// // //     return Container(
+// // //       decoration: BoxDecoration(
+// // //         borderRadius: BorderRadius.circular(10),
+// // //         border: Border.all(color: Colors.transparent, width: 1.5),
+// // //       ),
+// // //       child: SingleChildScrollView(
+// // //         scrollDirection: Axis.horizontal,
+// // //         child: SingleChildScrollView(
+// // //           scrollDirection: Axis.vertical,
+// // //           child: Table(
+// // //             defaultColumnWidth: const FixedColumnWidth(150),
+// // //             border: TableBorder.all(color: const Color(0xFF3498DB), width: 1),
+// // //             children: [
+// // //               /// ✅ العناوين - جدول الشركات
+// // //               TableRow(
+// // //                 decoration: BoxDecoration(
+// // //                   color: const Color(0xFF3498DB).withOpacity(0.15),
+// // //                 ),
+// // //                 children: const [
+// // //                   _TableCellHeader('م'),
+// // //                   _TableCellHeader('مكان التحميل'),
+// // //                   _TableCellHeader('مكان التعتيق'),
+// // //                   _TableCellHeader('نوع العربية'),
+// // //                   _TableCellHeader('النولون'),
+// // //                   _TableCellHeader('المبيت'),
+// // //                   _TableCellHeader('العطلة'),
+// // //                   _TableCellHeader('الإجراءات'),
+// // //                 ],
+// // //               ),
+
+// // //               /// ✅ الصفوف - جدول الشركات
+// // //               ...transportations.asMap().entries.map((entry) {
+// // //                 final index = entry.key;
+// // //                 final item = entry.value;
+// // //                 final transport = item.transportation;
+
+// // //                 return TableRow(
+// // //                   decoration: BoxDecoration(
+// // //                     color: index.isEven
+// // //                         ? Colors.white
+// // //                         : const Color(0xFFF8F9FA),
+// // //                   ),
+// // //                   children: [
+// // //                     _TableCellBody('${index + 1}'),
+// // //                     _TableCellBody(transport.loadingLocation),
+// // //                     _TableCellBody(transport.unloadingLocation),
+// // //                     _TableCellBody(transport.vehicleType),
+// // //                     _TableCellBody('${_formatNumber(transport.nolon)} ج'),
+// // //                     _TableCellBody(
+// // //                       '${_formatNumber(transport.companyOvernight)} ج',
+// // //                     ),
+// // //                     _TableCellBody(
+// // //                       '${_formatNumber(transport.companyHoliday)} ج',
+// // //                     ),
+// // //                     _TableCellActions(
+// // //                       onEdit: () => _editTransportation(item, 'companies'),
+// // //                       onDelete: () => _deleteTransportation(item),
+// // //                     ),
+// // //                   ],
+// // //                 );
+// // //               }),
+// // //             ],
+// // //           ),
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   Widget _buildWheelsTable(List<TransportationWithOffer> transportations) {
+// // //     return Container(
+// // //       decoration: BoxDecoration(
+// // //         borderRadius: BorderRadius.circular(10),
+// // //         border: Border.all(color: Colors.transparent, width: 1.5),
+// // //       ),
+// // //       child: SingleChildScrollView(
+// // //         scrollDirection: Axis.horizontal,
+// // //         child: SingleChildScrollView(
+// // //           scrollDirection: Axis.vertical,
+// // //           child: Table(
+// // //             defaultColumnWidth: const FixedColumnWidth(150),
+// // //             border: TableBorder.all(color: const Color(0xFF6A1B9A), width: 1),
+// // //             children: [
+// // //               /// ✅ العناوين - جدول العجل
+// // //               TableRow(
+// // //                 decoration: BoxDecoration(
+// // //                   color: const Color(0xFF6A1B9A).withOpacity(0.15),
+// // //                 ),
+// // //                 children: const [
+// // //                   _TableCellHeader('م'),
+// // //                   _TableCellHeader('مكان التحميل'),
+// // //                   _TableCellHeader('مكان التعتيق'),
+// // //                   _TableCellHeader('نوع العربية'),
+// // //                   _TableCellHeader('النولون'),
+// // //                   _TableCellHeader('المبيت'),
+// // //                   _TableCellHeader('العطلة'),
+// // //                   _TableCellHeader('الإجراءات'),
+// // //                 ],
+// // //               ),
+
+// // //               /// ✅ الصفوف - جدول العجل
+// // //               ...transportations.asMap().entries.map((entry) {
+// // //                 final index = entry.key;
+// // //                 final item = entry.value;
+// // //                 final transport = item.transportation;
+
+// // //                 return TableRow(
+// // //                   decoration: BoxDecoration(
+// // //                     color: index.isEven
+// // //                         ? Colors.white
+// // //                         : const Color(0xFFF8F9FA),
+// // //                   ),
+// // //                   children: [
+// // //                     _TableCellBody('${index + 1}'),
+// // //                     _TableCellBody(transport.loadingLocation),
+// // //                     _TableCellBody(transport.unloadingLocation),
+// // //                     _TableCellBody(transport.vehicleType),
+// // //                     _TableCellBody('${_formatNumber(transport.wheelNolon)} ج'),
+// // //                     _TableCellBody(
+// // //                       '${_formatNumber(transport.wheelOvernight)} ج',
+// // //                     ),
+// // //                     _TableCellBody(
+// // //                       '${_formatNumber(transport.wheelHoliday)} ج',
+// // //                     ),
+// // //                     _TableCellActions(
+// // //                       onEdit: () => _editTransportation(item, 'wheels'),
+// // //                       onDelete: () => _deleteTransportation(item),
+// // //                     ),
+// // //                   ],
+// // //                 );
+// // //               }),
+// // //             ],
+// // //           ),
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // دالة تعديل الرحلة
+// // //   void _editTransportation(TransportationWithOffer item, String viewType) {
+// // //     final transportation = item.transportation;
+// // //     final isCompaniesView = viewType == 'companies';
+
+// // //     final loadingLocationController = TextEditingController(
+// // //       text: transportation.loadingLocation,
+// // //     );
+// // //     final unloadingLocationController = TextEditingController(
+// // //       text: transportation.unloadingLocation,
+// // //     );
+// // //     final vehicleTypeController = TextEditingController(
+// // //       text: transportation.vehicleType,
+// // //     );
+// // //     final nolonController = TextEditingController(
+// // //       text: isCompaniesView
+// // //           ? _formatNumber(transportation.nolon)
+// // //           : _formatNumber(transportation.wheelNolon),
+// // //     );
+// // //     final overnightController = TextEditingController(
+// // //       text: isCompaniesView
+// // //           ? _formatNumber(transportation.companyOvernight)
+// // //           : _formatNumber(transportation.wheelOvernight),
+// // //     );
+// // //     final holidayController = TextEditingController(
+// // //       text: isCompaniesView
+// // //           ? _formatNumber(transportation.companyHoliday)
+// // //           : _formatNumber(transportation.wheelHoliday),
+// // //     );
+// // //     final notesController = TextEditingController(
+// // //       text: transportation.notes ?? '',
+// // //     );
+
+// // //     showDialog(
+// // //       context: context,
+// // //       builder: (context) => Directionality(
+// // //         textDirection: t.TextDirection.rtl,
+// // //         child: Dialog(
+// // //           backgroundColor: Colors.white,
+// // //           shape: RoundedRectangleBorder(
+// // //             borderRadius: BorderRadius.circular(16),
+// // //           ),
+// // //           child: SingleChildScrollView(
+// // //             child: Container(
+// // //               padding: const EdgeInsets.all(24),
+// // //               width: MediaQuery.of(context).size.width * 0.9,
+// // //               child: Column(
+// // //                 mainAxisSize: MainAxisSize.min,
+// // //                 crossAxisAlignment: CrossAxisAlignment.start,
+// // //                 children: [
+// // //                   // العنوان
+// // //                   Row(
+// // //                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// // //                     children: [
+// // //                       Text(
+// // //                         'تعديل الرحلة - ${isCompaniesView ? 'الشركات' : 'العجل'}',
+// // //                         style: const TextStyle(
+// // //                           fontSize: 20,
+// // //                           fontWeight: FontWeight.bold,
+// // //                           color: Color(0xFF2C3E50),
+// // //                         ),
+// // //                       ),
+// // //                       IconButton(
+// // //                         icon: const Icon(Icons.close),
+// // //                         onPressed: () => Navigator.pop(context),
+// // //                       ),
+// // //                     ],
+// // //                   ),
+
+// // //                   const SizedBox(height: 8),
+// // //                   Divider(color: const Color(0xFF3498DB).withOpacity(0.3)),
+
+// // //                   const SizedBox(height: 20),
+
+// // //                   // حقل مكان التحميل
+// // //                   _buildEditField(
+// // //                     'مكان التحميل',
+// // //                     'أدخل مكان التحميل',
+// // //                     loadingLocationController,
+// // //                     Icons.location_on,
+// // //                   ),
+
+// // //                   const SizedBox(height: 16),
+
+// // //                   // حقل مكان التعتيق
+// // //                   _buildEditField(
+// // //                     'مكان التعتيق',
+// // //                     'أدخل مكان التعتيق',
+// // //                     unloadingLocationController,
+// // //                     Icons.location_on,
+// // //                   ),
+
+// // //                   const SizedBox(height: 16),
+
+// // //                   // حقل نوع العربية
+// // //                   _buildEditField(
+// // //                     'نوع العربية',
+// // //                     'أدخل نوع العربية',
+// // //                     vehicleTypeController,
+// // //                     Icons.directions_car,
+// // //                   ),
+
+// // //                   const SizedBox(height: 16),
+
+// // //                   // حقل النولون
+// // //                   _buildEditField(
+// // //                     'النولون',
+// // //                     'أدخل النولون',
+// // //                     nolonController,
+// // //                     Icons.attach_money,
+// // //                     keyboardType: TextInputType.number,
+// // //                   ),
+
+// // //                   const SizedBox(height: 16),
+
+// // //                   // حقل المبيت
+// // //                   _buildEditField(
+// // //                     'المبيت',
+// // //                     'أدخل المبيت',
+// // //                     overnightController,
+// // //                     Icons.hotel,
+// // //                     keyboardType: TextInputType.number,
+// // //                   ),
+
+// // //                   const SizedBox(height: 16),
+
+// // //                   // حقل العطلة
+// // //                   _buildEditField(
+// // //                     'العطلة',
+// // //                     'أدخل العطلة',
+// // //                     holidayController,
+// // //                     Icons.beach_access,
+// // //                     keyboardType: TextInputType.number,
+// // //                   ),
+
+// // //                   const SizedBox(height: 16),
+
+// // //                   // حقل الملاحظات
+// // //                   _buildEditField(
+// // //                     'ملاحظات',
+// // //                     'أدخل الملاحظات (اختياري)',
+// // //                     notesController,
+// // //                     Icons.note,
+// // //                     maxLines: 3,
+// // //                   ),
+
+// // //                   const SizedBox(height: 24),
+
+// // //                   // أزرار الحفظ والإلغاء
+// // //                   Row(
+// // //                     children: [
+// // //                       Expanded(
+// // //                         child: OutlinedButton(
+// // //                           onPressed: () => Navigator.pop(context),
+// // //                           style: OutlinedButton.styleFrom(
+// // //                             padding: const EdgeInsets.symmetric(vertical: 12),
+// // //                             shape: RoundedRectangleBorder(
+// // //                               borderRadius: BorderRadius.circular(8),
+// // //                             ),
+// // //                           ),
+// // //                           child: const Text(
+// // //                             'إلغاء',
+// // //                             style: TextStyle(
+// // //                               color: Color(0xFF2C3E50),
+// // //                               fontWeight: FontWeight.bold,
+// // //                             ),
+// // //                           ),
+// // //                         ),
+// // //                       ),
+// // //                       const SizedBox(width: 12),
+// // //                       Expanded(
+// // //                         child: ElevatedButton(
+// // //                           onPressed: () {
+// // //                             _updateTransportation(
+// // //                               item,
+// // //                               loadingLocationController.text,
+// // //                               unloadingLocationController.text,
+// // //                               vehicleTypeController.text,
+// // //                               nolonController.text,
+// // //                               overnightController.text,
+// // //                               holidayController.text,
+// // //                               notesController.text,
+// // //                               isCompaniesView,
+// // //                             );
+// // //                             Navigator.pop(context);
+// // //                           },
+// // //                           style: ElevatedButton.styleFrom(
+// // //                             backgroundColor: const Color(0xFF3498DB),
+// // //                             foregroundColor: Colors.white,
+// // //                             padding: const EdgeInsets.symmetric(vertical: 12),
+// // //                             shape: RoundedRectangleBorder(
+// // //                               borderRadius: BorderRadius.circular(8),
+// // //                             ),
+// // //                           ),
+// // //                           child: const Text(
+// // //                             'حفظ التعديلات',
+// // //                             style: TextStyle(fontWeight: FontWeight.bold),
+// // //                           ),
+// // //                         ),
+// // //                       ),
+// // //                     ],
+// // //                   ),
+// // //                 ],
+// // //               ),
+// // //             ),
+// // //           ),
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   Widget _buildEditField(
+// // //     String label,
+// // //     String hint,
+// // //     TextEditingController controller,
+// // //     IconData icon, {
+// // //     TextInputType keyboardType = TextInputType.text,
+// // //     int maxLines = 1,
+// // //   }) {
+// // //     return Column(
+// // //       crossAxisAlignment: CrossAxisAlignment.start,
+// // //       children: [
+// // //         Text(
+// // //           label,
+// // //           style: const TextStyle(
+// // //             fontWeight: FontWeight.bold,
+// // //             color: Color(0xFF2C3E50),
+// // //             fontSize: 14,
+// // //           ),
+// // //         ),
+// // //         const SizedBox(height: 6),
+// // //         TextFormField(
+// // //           controller: controller,
+// // //           keyboardType: keyboardType,
+// // //           maxLines: maxLines,
+// // //           decoration: InputDecoration(
+// // //             hintText: hint,
+// // //             prefixIcon: Icon(icon, color: const Color(0xFF3498DB)),
+// // //             filled: true,
+// // //             fillColor: const Color(0xFFF4F6F8),
+// // //             border: OutlineInputBorder(
+// // //               borderRadius: BorderRadius.circular(8),
+// // //               borderSide: BorderSide.none,
+// // //             ),
+// // //             contentPadding: const EdgeInsets.symmetric(
+// // //               horizontal: 16,
+// // //               vertical: 12,
+// // //             ),
+// // //           ),
+// // //         ),
+// // //       ],
+// // //     );
+// // //   }
+
+// // //   // دالة تحديث الرحلة في Firebase
+// // //   Future<void> _updateTransportation(
+// // //     TransportationWithOffer item,
+// // //     String loadingLocation,
+// // //     String unloadingLocation,
+// // //     String vehicleType,
+// // //     String nolon,
+// // //     String overnight,
+// // //     String holiday,
+// // //     String notes,
+// // //     bool isCompaniesView,
+// // //   ) async {
+// // //     try {
+// // //       final offerRef = _firestore
+// // //           .collection('companies')
+// // //           .doc(item.companyId)
+// // //           .collection('priceOffers')
+// // //           .doc(item.offerId);
+
+// // //       // جلب العرض الحالي
+// // //       final offerDoc = await offerRef.get();
+// // //       final offerData = offerDoc.data() as Map<String, dynamic>;
+// // //       final List<dynamic> transportations = offerData['transportations'];
+
+// // //       // تحديث الرحلة المحددة
+// // //       final updatedTransportations = transportations.map((transport) {
+// // //         final map = transport as Map<String, dynamic>;
+// // //         if (map['loadingLocation'] == item.transportation.loadingLocation &&
+// // //             map['unloadingLocation'] == item.transportation.unloadingLocation &&
+// // //             map['vehicleType'] == item.transportation.vehicleType) {
+// // //           final updatedMap = {
+// // //             ...map,
+// // //             'loadingLocation': loadingLocation.trim(),
+// // //             'unloadingLocation': unloadingLocation.trim(),
+// // //             'vehicleType': vehicleType.trim(),
+// // //             'notes': notes.trim().isEmpty ? null : notes.trim(),
+// // //           };
+
+// // //           // تحديث الحقول حسب النوع مع تقريب الأرقام
+// // //           if (isCompaniesView) {
+// // //             double? nolonValue = double.tryParse(nolon);
+// // //             double? overnightValue = double.tryParse(overnight);
+// // //             double? holidayValue = double.tryParse(holiday);
+
+// // //             // ✅ تقريب الأرقام إلى رقم واحد بعد العلامة العشرية
+// // //             updatedMap['nolon'] = nolonValue != null
+// // //                 ? _roundToOneDecimal(nolonValue)
+// // //                 : item.transportation.nolon;
+
+// // //             updatedMap['companyOvernight'] = overnightValue != null
+// // //                 ? _roundToOneDecimal(overnightValue)
+// // //                 : item.transportation.companyOvernight;
+
+// // //             updatedMap['companyHoliday'] = holidayValue != null
+// // //                 ? _roundToOneDecimal(holidayValue)
+// // //                 : item.transportation.companyHoliday;
+// // //           } else {
+// // //             double? nolonValue = double.tryParse(nolon);
+// // //             double? overnightValue = double.tryParse(overnight);
+// // //             double? holidayValue = double.tryParse(holiday);
+
+// // //             // ✅ تقريب الأرقام إلى رقم واحد بعد العلامة العشرية
+// // //             updatedMap['wheelNolon'] = nolonValue != null
+// // //                 ? _roundToOneDecimal(nolonValue)
+// // //                 : item.transportation.wheelNolon;
+
+// // //             updatedMap['wheelOvernight'] = overnightValue != null
+// // //                 ? _roundToOneDecimal(overnightValue)
+// // //                 : item.transportation.wheelOvernight;
+
+// // //             updatedMap['wheelHoliday'] = holidayValue != null
+// // //                 ? _roundToOneDecimal(holidayValue)
+// // //                 : item.transportation.wheelHoliday;
+// // //           }
+
+// // //           return updatedMap;
+// // //         }
+// // //         return transport;
+// // //       }).toList();
+
+// // //       // تحديث العرض في Firebase
+// // //       await offerRef.update({
+// // //         'transportations': updatedTransportations,
+// // //         'updatedAt': Timestamp.now(),
+// // //       });
+
+// // //       // إظهار رسالة نجاح
+// // //       if (mounted) {
+// // //         ScaffoldMessenger.of(context).showSnackBar(
+// // //           const SnackBar(
+// // //             content: Text('تم تعديل الرحلة بنجاح'),
+// // //             backgroundColor: Colors.green,
+// // //             duration: Duration(seconds: 2),
+// // //           ),
+// // //         );
+// // //       }
+// // //     } catch (e) {
+// // //       print('Error updating transportation: $e');
+// // //       if (mounted) {
+// // //         ScaffoldMessenger.of(context).showSnackBar(
+// // //           SnackBar(
+// // //             content: Text('خطأ في التعديل: $e'),
+// // //             backgroundColor: Colors.red,
+// // //             duration: const Duration(seconds: 3),
+// // //           ),
+// // //         );
+// // //       }
+// // //     }
+// // //   }
+
+// // //   // دالة حذف الرحلة
+// // //   void _deleteTransportation(TransportationWithOffer item) {
+// // //     showDialog(
+// // //       context: context,
+// // //       builder: (context) => Directionality(
+// // //         textDirection: t.TextDirection.rtl,
+// // //         child: AlertDialog(
+// // //           backgroundColor: Colors.white,
+// // //           shape: RoundedRectangleBorder(
+// // //             borderRadius: BorderRadius.circular(16),
+// // //           ),
+// // //           title: const Row(
+// // //             children: [
+// // //               Icon(Icons.warning, color: Colors.orange),
+// // //               SizedBox(width: 8),
+// // //               Text(
+// // //                 'تأكيد الحذف',
+// // //                 style: TextStyle(
+// // //                   fontWeight: FontWeight.bold,
+// // //                   color: Color(0xFF2C3E50),
+// // //                 ),
+// // //               ),
+// // //             ],
+// // //           ),
+// // //           content: Column(
+// // //             mainAxisSize: MainAxisSize.min,
+// // //             crossAxisAlignment: CrossAxisAlignment.start,
+// // //             children: [
+// // //               const Text(
+// // //                 'هل أنت متأكد من حذف هذه الرحلة؟',
+// // //                 style: TextStyle(fontSize: 16),
+// // //               ),
+// // //               const SizedBox(height: 8),
+// // //               Text(
+// // //                 'المسار: ${item.transportation.loadingLocation} → ${item.transportation.unloadingLocation}',
+// // //                 style: const TextStyle(color: Colors.grey),
+// // //               ),
+// // //               Text(
+// // //                 'النولون: ${_formatNumber(item.transportation.nolon)} ج',
+// // //                 style: const TextStyle(color: Colors.grey),
+// // //               ),
+// // //               const SizedBox(height: 16),
+// // //               const Text(
+// // //                 '⚠️ لا يمكن التراجع عن هذا الإجراء',
+// // //                 style: TextStyle(
+// // //                   color: Colors.red,
+// // //                   fontSize: 12,
+// // //                   fontWeight: FontWeight.bold,
+// // //                 ),
+// // //               ),
+// // //             ],
+// // //           ),
+// // //           actions: [
+// // //             TextButton(
+// // //               onPressed: () => Navigator.pop(context),
+// // //               child: const Text(
+// // //                 'إلغاء',
+// // //                 style: TextStyle(color: Color(0xFF2C3E50)),
+// // //               ),
+// // //             ),
+// // //             ElevatedButton(
+// // //               onPressed: () {
+// // //                 _confirmDeleteTransportation(item);
+// // //                 Navigator.pop(context);
+// // //               },
+// // //               style: ElevatedButton.styleFrom(
+// // //                 backgroundColor: Colors.red,
+// // //                 foregroundColor: Colors.white,
+// // //               ),
+// // //               child: const Text('حذف'),
+// // //             ),
+// // //           ],
+// // //         ),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   // دالة تأكيد الحذف
+// // //   Future<void> _confirmDeleteTransportation(
+// // //     TransportationWithOffer item,
+// // //   ) async {
+// // //     try {
+// // //       final offerRef = _firestore
+// // //           .collection('companies')
+// // //           .doc(item.companyId)
+// // //           .collection('priceOffers')
+// // //           .doc(item.offerId);
+
+// // //       // جلب العرض الحالي
+// // //       final offerDoc = await offerRef.get();
+// // //       final offerData = offerDoc.data() as Map<String, dynamic>;
+// // //       final List<dynamic> transportations = offerData['transportations'];
+
+// // //       // تصفية الرحلة المطلوب حذفها
+// // //       final updatedTransportations = transportations.where((transport) {
+// // //         final map = transport as Map<String, dynamic>;
+// // //         return !(map['loadingLocation'] ==
+// // //                 item.transportation.loadingLocation &&
+// // //             map['unloadingLocation'] == item.transportation.unloadingLocation &&
+// // //             map['vehicleType'] == item.transportation.vehicleType);
+// // //       }).toList();
+
+// // //       // إذا لم يتبقى أي رحلات، احذف العرض كاملاً
+// // //       if (updatedTransportations.isEmpty) {
+// // //         await offerRef.delete();
+// // //       } else {
+// // //         // وإلا قم بتحديث العرض
+// // //         await offerRef.update({
+// // //           'transportations': updatedTransportations,
+// // //           'updatedAt': Timestamp.now(),
+// // //         });
+// // //       }
+
+// // //       // إظهار رسالة نجاح
+// // //       if (mounted) {
+// // //         ScaffoldMessenger.of(context).showSnackBar(
+// // //           const SnackBar(
+// // //             content: Text('تم حذف الرحلة بنجاح'),
+// // //             backgroundColor: Colors.green,
+// // //             duration: Duration(seconds: 2),
+// // //           ),
+// // //         );
+// // //       }
+// // //     } catch (e) {
+// // //       print('Error deleting transportation: $e');
+// // //       if (mounted) {
+// // //         ScaffoldMessenger.of(context).showSnackBar(
+// // //           SnackBar(
+// // //             content: Text('خطأ في الحذف: $e'),
+// // //             backgroundColor: Colors.red,
+// // //             duration: const Duration(seconds: 3),
+// // //           ),
+// // //         );
+// // //       }
+// // //     }
+// // //   }
+
+// // //   Widget _buildActionButton({
+// // //     required IconData icon,
+// // //     required String label,
+// // //     required Color color,
+// // //     required VoidCallback onPressed,
+// // //   }) {
+// // //     return ElevatedButton.icon(
+// // //       onPressed: onPressed,
+// // //       icon: Icon(icon, size: 18),
+// // //       label: Text(label),
+// // //       style: ElevatedButton.styleFrom(
+// // //         backgroundColor: color.withOpacity(0.9),
+// // //         foregroundColor: Colors.white,
+// // //         elevation: 0,
+// // //         padding: const EdgeInsets.symmetric(vertical: 10),
+// // //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+// // //       ),
+// // //     );
+// // //   }
+
+// // //   String _formatDate(DateTime date) {
+// // //     return '${date.day}/${date.month}/${date.year}';
+// // //   }
+// // // }
+
+// // // // نموذج مساعد لتخزين معلومات الرحلة مع معلومات العرض
+// // // class TransportationWithOffer {
+// // //   final Transportation transportation;
+// // //   final offerId;
+// // //   final String companyId;
+// // //   final PriceOffer offer;
+
+// // //   TransportationWithOffer({
+// // //     required this.transportation,
+// // //     required this.offerId,
+// // //     required this.companyId,
+// // //     required this.offer,
+// // //   });
+// // // }
+
+// // // class _TableCellBody extends StatelessWidget {
+// // //   final String text;
+// // //   final TextStyle? textStyle;
+
+// // //   const _TableCellBody(this.text, {this.textStyle});
+
+// // //   @override
+// // //   Widget build(BuildContext context) {
+// // //     return Container(
+// // //       height: 48,
+// // //       alignment: Alignment.center,
+// // //       padding: const EdgeInsets.symmetric(horizontal: 8),
+// // //       child: Text(
+// // //         text,
+// // //         maxLines: 2,
+// // //         overflow: TextOverflow.ellipsis,
+// // //         textAlign: TextAlign.center,
+// // //         style: textStyle,
+// // //       ),
+// // //     );
+// // //   }
+// // // }
+
+// // // class _TableCellHeader extends StatelessWidget {
+// // //   final String text;
+// // //   const _TableCellHeader(this.text);
+
+// // //   @override
+// // //   Widget build(BuildContext context) {
+// // //     return Container(
+// // //       height: 50,
+// // //       alignment: Alignment.center,
+// // //       padding: const EdgeInsets.symmetric(horizontal: 8),
+// // //       child: Text(
+// // //         text,
+// // //         style: const TextStyle(
+// // //           fontWeight: FontWeight.bold,
+// // //           fontSize: 14,
+// // //           color: Color(0xFF2C3E50),
+// // //         ),
+// // //         textAlign: TextAlign.center,
+// // //       ),
+// // //     );
+// // //   }
+// // // }
+
+// // // class _TableCellActions extends StatelessWidget {
+// // //   final VoidCallback onEdit;
+// // //   final VoidCallback onDelete;
+
+// // //   const _TableCellActions({required this.onEdit, required this.onDelete});
+
+// // //   @override
+// // //   Widget build(BuildContext context) {
+// // //     return Container(
+// // //       height: 48,
+// // //       alignment: Alignment.center,
+// // //       padding: const EdgeInsets.symmetric(horizontal: 4),
+// // //       child: Row(
+// // //         mainAxisAlignment: MainAxisAlignment.center,
+// // //         children: [
+// // //           // زر التعديل
+// // //           IconButton(
+// // //             icon: Container(
+// // //               padding: const EdgeInsets.all(6),
+// // //               decoration: BoxDecoration(
+// // //                 color: Colors.blue.withOpacity(0.1),
+// // //                 borderRadius: BorderRadius.circular(6),
+// // //               ),
+// // //               child: const Icon(Icons.edit, size: 16, color: Colors.blue),
+// // //             ),
+// // //             onPressed: onEdit,
+// // //             padding: EdgeInsets.zero,
+// // //             constraints: const BoxConstraints(),
+// // //           ),
+// // //           const SizedBox(width: 4),
+// // //           // زر الحذف
+// // //           IconButton(
+// // //             icon: Container(
+// // //               padding: const EdgeInsets.all(6),
+// // //               decoration: BoxDecoration(
+// // //                 color: Colors.red.withOpacity(0.1),
+// // //                 borderRadius: BorderRadius.circular(6),
+// // //               ),
+// // //               child: const Icon(Icons.delete, size: 16, color: Colors.red),
+// // //             ),
+// // //             onPressed: onDelete,
+// // //             padding: EdgeInsets.zero,
+// // //             constraints: const BoxConstraints(),
+// // //           ),
+// // //         ],
+// // //       ),
+// // //     );
+// // //   }
+// // // }
 // // import 'package:cloud_firestore/cloud_firestore.dart';
 // // import 'package:flutter/material.dart';
 // // import 'package:last/models/models.dart';
@@ -7,6 +5760,9 @@
 // // import 'package:intl/intl.dart';
 // // import 'package:flutter/services.dart';
 // // import 'package:flutter/widgets.dart' as t;
+// // import 'package:file_picker/file_picker.dart';
+// // import 'package:path/path.dart' as path;
+// // import 'package:permission_handler/permission_handler.dart';
 
 // // class PriceOffersListScreen extends StatefulWidget {
 // //   const PriceOffersListScreen({super.key});
@@ -26,6 +5782,14 @@
 // //   String? _currentCompanyId;
 // //   List<TransportationWithOffer>? _currentTransportations;
 
+// //   // متغير لتتبع حالة الـ Switch (true: حفظ الأرقام برقم واحد بعد العلامة، false: تقريب لأسفل)
+// //   bool _keepNumbersAsIs = true;
+
+// //   // دالة مساعدة لتقريب الرقم إلى رقم واحد بعد العلامة العشرية
+// //   double _roundToOneDecimal(double value) {
+// //     return (value * 10).roundToDouble() / 10;
+// //   }
+
 // //   @override
 // //   void initState() {
 // //     super.initState();
@@ -42,6 +5806,17 @@
 // //       debugPrint('تم تحميل الخط العربي بنجاح');
 // //     } catch (e) {
 // //       debugPrint('فشل تحميل الخط العربي: $e');
+// //     }
+// //   }
+
+// //   // دالة لطلب صلاحية التخزين
+// //   Future<bool> _requestStoragePermission() async {
+// //     if (await Permission.storage.request().isGranted) {
+// //       return true;
+// //     } else if (await Permission.manageExternalStorage.request().isGranted) {
+// //       return true;
+// //     } else {
+// //       return false;
 // //     }
 // //   }
 
@@ -399,10 +6174,10 @@
 // //                     Row(
 // //                       mainAxisSize: MainAxisSize.min,
 // //                       children: [
-// //                         // زر الطباعة
+// //                         // زر حفظ PDF
 // //                         IconButton(
-// //                           icon: Icon(Icons.print, color: Colors.green[700]),
-// //                           onPressed: () => _generatePDF(),
+// //                           icon: Icon(Icons.save_alt, color: Colors.green[700]),
+// //                           onPressed: () => _generateAndSavePDF(),
 // //                         ),
 // //                         // زر الإغلاق
 // //                         IconButton(
@@ -505,18 +6280,19 @@
 
 // //                 const SizedBox(height: 16),
 
-// //                 // زر الإغلاق
+// //                 // أزرار الإجراءات
 // //                 Row(
 // //                   mainAxisAlignment: MainAxisAlignment.center,
 // //                   children: [
+// //                     // زر رفع الأسعار
 // //                     ElevatedButton(
-// //                       onPressed: () => _generatePDF(),
+// //                       onPressed: () => _showIncreasePricesDialog(viewType),
 // //                       style: ElevatedButton.styleFrom(
-// //                         backgroundColor: const Color.fromARGB(255, 255, 0, 0),
+// //                         backgroundColor: Colors.orange,
 // //                         foregroundColor: Colors.white,
 // //                         elevation: 2,
 // //                         padding: const EdgeInsets.symmetric(
-// //                           horizontal: 40,
+// //                           horizontal: 30,
 // //                           vertical: 12,
 // //                         ),
 // //                         shape: RoundedRectangleBorder(
@@ -526,16 +6302,45 @@
 // //                       child: Row(
 // //                         children: [
 // //                           Icon(
-// //                             Icons.print,
+// //                             Icons.trending_up,
 // //                             color: const Color.fromARGB(255, 255, 255, 255),
 // //                           ),
-
-// //                           // Text('طباعه'),
+// //                           const SizedBox(width: 8),
+// //                           const Text('رفع الأسعار'),
 // //                         ],
 // //                       ),
 // //                     ),
-// //                     SizedBox(width: 10),
+// //                     const SizedBox(width: 10),
 
+// //                     // زر حفظ PDF
+// //                     ElevatedButton(
+// //                       onPressed: () => _generateAndSavePDF(),
+// //                       style: ElevatedButton.styleFrom(
+// //                         backgroundColor: Colors.green,
+// //                         foregroundColor: Colors.white,
+// //                         elevation: 2,
+// //                         padding: const EdgeInsets.symmetric(
+// //                           horizontal: 30,
+// //                           vertical: 12,
+// //                         ),
+// //                         shape: RoundedRectangleBorder(
+// //                           borderRadius: BorderRadius.circular(8),
+// //                         ),
+// //                       ),
+// //                       child: Row(
+// //                         children: [
+// //                           Icon(
+// //                             Icons.save_alt,
+// //                             color: const Color.fromARGB(255, 255, 255, 255),
+// //                           ),
+// //                           const SizedBox(width: 8),
+// //                           const Text('حفظ PDF'),
+// //                         ],
+// //                       ),
+// //                     ),
+// //                     const SizedBox(width: 10),
+
+// //                     // زر الإغلاق
 // //                     ElevatedButton(
 // //                       onPressed: () => Navigator.pop(context),
 // //                       style: ElevatedButton.styleFrom(
@@ -560,6 +6365,330 @@
 // //         ),
 // //       ),
 // //     );
+// //   }
+
+// //   // عرض نافذة رفع الأسعار
+// //   void _showIncreasePricesDialog(String viewType) {
+// //     final TextEditingController percentageController = TextEditingController();
+// //     bool keepNumbersAsIs =
+// //         _keepNumbersAsIs; // القيمة الافتراضية من المتغير العام
+
+// //     showDialog(
+// //       context: context,
+// //       builder: (context) => Directionality(
+// //         textDirection: t.TextDirection.rtl,
+// //         child: StatefulBuilder(
+// //           builder: (context, setState) {
+// //             return AlertDialog(
+// //               backgroundColor: Colors.white,
+// //               shape: RoundedRectangleBorder(
+// //                 borderRadius: BorderRadius.circular(16),
+// //               ),
+// //               title: Row(
+// //                 children: [
+// //                   Icon(Icons.trending_up, color: Colors.orange[700]),
+// //                   const SizedBox(width: 8),
+// //                   Text(
+// //                     viewType == 'companies'
+// //                         ? 'رفع أسعار الشركات'
+// //                         : 'رفع أسعار العجل',
+// //                     style: const TextStyle(
+// //                       fontWeight: FontWeight.bold,
+// //                       color: Color(0xFF2C3E50),
+// //                     ),
+// //                   ),
+// //                 ],
+// //               ),
+// //               content: Column(
+// //                 mainAxisSize: MainAxisSize.min,
+// //                 crossAxisAlignment: CrossAxisAlignment.start,
+// //                 children: [
+// //                   Text(
+// //                     viewType == 'companies'
+// //                         ? 'سيتم رفع أسعار النولون، المبيت، والعطلة لجميع عروض الشركات بنسبة:'
+// //                         : 'سيتم رفع أسعار النولون، المبيت، والعطلة لجميع عروض العجل بنسبة:',
+// //                     style: const TextStyle(fontSize: 14),
+// //                   ),
+// //                   const SizedBox(height: 16),
+// //                   TextFormField(
+// //                     controller: percentageController,
+// //                     keyboardType: TextInputType.number,
+// //                     decoration: InputDecoration(
+// //                       hintText: 'أدخل النسبة المؤوية (مثال: 10)',
+// //                       prefixIcon: const Icon(
+// //                         Icons.percent,
+// //                         color: Color(0xFF3498DB),
+// //                       ),
+// //                       filled: true,
+// //                       fillColor: const Color(0xFFF4F6F8),
+// //                       border: OutlineInputBorder(
+// //                         borderRadius: BorderRadius.circular(8),
+// //                         borderSide: BorderSide.none,
+// //                       ),
+// //                       contentPadding: const EdgeInsets.symmetric(
+// //                         horizontal: 16,
+// //                         vertical: 12,
+// //                       ),
+// //                     ),
+// //                   ),
+// //                   const SizedBox(height: 16),
+
+// //                   // ✅ إضافة الـ Switch للتحكم في طريقة حفظ الأرقام
+// //                   Container(
+// //                     padding: const EdgeInsets.all(12),
+// //                     decoration: BoxDecoration(
+// //                       color: const Color(0xFFF4F6F8),
+// //                       borderRadius: BorderRadius.circular(8),
+// //                       border: Border.all(
+// //                         color: const Color(0xFF3498DB).withOpacity(0.3),
+// //                       ),
+// //                     ),
+// //                     child: Row(
+// //                       children: [
+// //                         Icon(
+// //                           Icons.circle,
+// //                           size: 12,
+// //                           color: keepNumbersAsIs ? Colors.green : Colors.orange,
+// //                         ),
+// //                         const SizedBox(width: 12),
+// //                         Expanded(
+// //                           child: Column(
+// //                             crossAxisAlignment: CrossAxisAlignment.start,
+// //                             children: [
+// //                               const Text(
+// //                                 'طريقة حفظ الأرقام',
+// //                                 style: TextStyle(
+// //                                   fontWeight: FontWeight.bold,
+// //                                   fontSize: 14,
+// //                                 ),
+// //                               ),
+// //                               const SizedBox(height: 2),
+// //                               Text(
+// //                                 keepNumbersAsIs
+// //                                     ? '✅ (10.5)زياده مع وجود كسور'
+// //                                     : '⬇️ (10)زياده مع الغاء كسور',
+// //                                 style: TextStyle(
+// //                                   fontSize: 11,
+// //                                   color: keepNumbersAsIs
+// //                                       ? Colors.green[700]
+// //                                       : Colors.orange[700],
+// //                                   fontWeight: FontWeight.w500,
+// //                                 ),
+// //                               ),
+// //                               const SizedBox(height: 4),
+// //                               Text(
+// //                                 keepNumbersAsIs
+// //                                     ? 'مثال: = 11.6 → 11.606'
+// //                                     : 'مثال:= 11 → 11.51',
+// //                                 style: TextStyle(
+// //                                   fontSize: 10,
+// //                                   color: Colors.grey[600],
+// //                                   fontStyle: FontStyle.italic,
+// //                                 ),
+// //                               ),
+// //                             ],
+// //                           ),
+// //                         ),
+// //                         Switch(
+// //                           value: keepNumbersAsIs,
+// //                           onChanged: (value) {
+// //                             setState(() {
+// //                               keepNumbersAsIs = value;
+// //                             });
+// //                           },
+// //                           activeColor: Colors.green,
+// //                           inactiveThumbColor: Colors.orange,
+// //                           inactiveTrackColor: Colors.orange.withOpacity(0.5),
+// //                         ),
+// //                       ],
+// //                     ),
+// //                   ),
+
+// //                   const SizedBox(height: 8),
+// //                   const Text(
+// //                     'ملاحظة: سيتم تطبيق الزيادة على جميع الأسعار الحالية',
+// //                     style: TextStyle(fontSize: 12, color: Colors.grey),
+// //                   ),
+// //                 ],
+// //               ),
+// //               actions: [
+// //                 TextButton(
+// //                   onPressed: () => Navigator.pop(context),
+// //                   child: const Text(
+// //                     'إلغاء',
+// //                     style: TextStyle(color: Color(0xFF2C3E50)),
+// //                   ),
+// //                 ),
+// //                 ElevatedButton(
+// //                   onPressed: () async {
+// //                     final percentage = double.tryParse(
+// //                       percentageController.text,
+// //                     );
+// //                     if (percentage == null || percentage <= 0) {
+// //                       ScaffoldMessenger.of(context).showSnackBar(
+// //                         const SnackBar(
+// //                           content: Text('الرجاء إدخال نسبة صحيحة أكبر من صفر'),
+// //                           backgroundColor: Colors.red,
+// //                         ),
+// //                       );
+// //                       return;
+// //                     }
+
+// //                     Navigator.pop(context);
+
+// //                     // ✅ تحديث الحالة العامة وتنفيذ رفع الأسعار مع خيار حفظ الأرقام
+// //                     setState(() {
+// //                       _keepNumbersAsIs = keepNumbersAsIs;
+// //                     });
+
+// //                     await _increasePrices(
+// //                       percentage,
+// //                       viewType,
+// //                       keepNumbersAsIs,
+// //                     );
+// //                   },
+// //                   style: ElevatedButton.styleFrom(
+// //                     backgroundColor: Colors.orange,
+// //                     foregroundColor: Colors.white,
+// //                   ),
+// //                   child: const Text('رفع الأسعار'),
+// //                 ),
+// //               ],
+// //             );
+// //           },
+// //         ),
+// //       ),
+// //     );
+// //   }
+
+// //   // دالة رفع الأسعار
+// //   Future<void> _increasePrices(
+// //     double percentage,
+// //     String viewType,
+// //     bool keepNumbersAsIs,
+// //   ) async {
+// //     try {
+// //       if (_currentCompanyId == null) return;
+
+// //       setState(() => _isGeneratingPDF = true);
+
+// //       final percentageFactor = 1 + (percentage / 100);
+
+// //       // جلب جميع العروض
+// //       final offersSnapshot = await _firestore
+// //           .collection('companies')
+// //           .doc(_currentCompanyId!)
+// //           .collection('priceOffers')
+// //           .get();
+
+// //       // تحديث كل عرض
+// //       for (final offerDoc in offersSnapshot.docs) {
+// //         final offerData = offerDoc.data();
+// //         final List<dynamic> transportations = List.from(
+// //           offerData['transportations'] ?? [],
+// //         );
+
+// //         // تحديث كل رحلة في العرض
+// //         final updatedTransportations = transportations.map((transport) {
+// //           final Map<String, dynamic> updatedTransport =
+// //               Map<String, dynamic>.from(transport);
+
+// //           if (viewType == 'companies') {
+// //             // رفع أسعار الشركات
+// //             if (updatedTransport['nolon'] != null) {
+// //               double value =
+// //                   (updatedTransport['nolon'] as num) * percentageFactor;
+// //               // ✅ تقريب الرقم إلى رقم واحد بعد العلامة العشرية
+// //               double roundedValue = _roundToOneDecimal(value);
+// //               updatedTransport['nolon'] = keepNumbersAsIs
+// //                   ? roundedValue
+// //                   : value.floor().toDouble();
+// //             }
+// //             if (updatedTransport['companyOvernight'] != null) {
+// //               double value =
+// //                   (updatedTransport['companyOvernight'] as num) *
+// //                   percentageFactor;
+// //               double roundedValue = _roundToOneDecimal(value);
+// //               updatedTransport['companyOvernight'] = keepNumbersAsIs
+// //                   ? roundedValue
+// //                   : value.floor().toDouble();
+// //             }
+// //             if (updatedTransport['companyHoliday'] != null) {
+// //               double value =
+// //                   (updatedTransport['companyHoliday'] as num) *
+// //                   percentageFactor;
+// //               double roundedValue = _roundToOneDecimal(value);
+// //               updatedTransport['companyHoliday'] = keepNumbersAsIs
+// //                   ? roundedValue
+// //                   : value.floor().toDouble();
+// //             }
+// //           } else {
+// //             // رفع أسعار العجل
+// //             if (updatedTransport['wheelNolon'] != null) {
+// //               double value =
+// //                   (updatedTransport['wheelNolon'] as num) * percentageFactor;
+// //               double roundedValue = _roundToOneDecimal(value);
+// //               updatedTransport['wheelNolon'] = keepNumbersAsIs
+// //                   ? roundedValue
+// //                   : value.floor().toDouble();
+// //             }
+// //             if (updatedTransport['wheelOvernight'] != null) {
+// //               double value =
+// //                   (updatedTransport['wheelOvernight'] as num) *
+// //                   percentageFactor;
+// //               double roundedValue = _roundToOneDecimal(value);
+// //               updatedTransport['wheelOvernight'] = keepNumbersAsIs
+// //                   ? roundedValue
+// //                   : value.floor().toDouble();
+// //             }
+// //             if (updatedTransport['wheelHoliday'] != null) {
+// //               double value =
+// //                   (updatedTransport['wheelHoliday'] as num) * percentageFactor;
+// //               double roundedValue = _roundToOneDecimal(value);
+// //               updatedTransport['wheelHoliday'] = keepNumbersAsIs
+// //                   ? roundedValue
+// //                   : value.floor().toDouble();
+// //             }
+// //           }
+
+// //           return updatedTransport;
+// //         }).toList();
+
+// //         // تحديث العرض في Firebase
+// //         await offerDoc.reference.update({
+// //           'transportations': updatedTransportations,
+// //           'updatedAt': Timestamp.now(),
+// //         });
+// //       }
+
+// //       if (mounted) {
+// //         ScaffoldMessenger.of(context).showSnackBar(
+// //           SnackBar(
+// //             content: Text(
+// //               'تم رفع الأسعار بنسبة ${percentage.toStringAsFixed(2)}% بنجاح' +
+// //                   (keepNumbersAsIs
+// //                       ? ' (تم حفظ الأرقام برقم واحد بعد العلامة)'
+// //                       : ' (تم تقريب الأرقام لأسفل)'),
+// //             ),
+// //             backgroundColor: Colors.green,
+// //             duration: const Duration(seconds: 3),
+// //           ),
+// //         );
+// //       }
+// //     } catch (e) {
+// //       print('Error increasing prices: $e');
+// //       if (mounted) {
+// //         ScaffoldMessenger.of(context).showSnackBar(
+// //           SnackBar(
+// //             content: Text('خطأ في رفع الأسعار: $e'),
+// //             backgroundColor: Colors.red,
+// //             duration: const Duration(seconds: 3),
+// //           ),
+// //         );
+// //       }
+// //     } finally {
+// //       setState(() => _isGeneratingPDF = false);
+// //     }
 // //   }
 
 // //   Widget _buildCompanyOffersTable(String companyId, String viewType) {
@@ -638,8 +6767,8 @@
 // //     );
 // //   }
 
-// //   // ================= إنشاء PDF =================
-// //   Future<void> _generatePDF() async {
+// //   // ================= إنشاء وحفظ PDF =================
+// //   Future<void> _generateAndSavePDF() async {
 // //     if (_arabicFont == null) {
 // //       ScaffoldMessenger.of(
 // //         context,
@@ -652,13 +6781,38 @@
 // //         _currentTransportations == null) {
 // //       ScaffoldMessenger.of(
 // //         context,
-// //       ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للطباعة')));
+// //       ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للحفظ')));
 // //       return;
 // //     }
 
 // //     setState(() => _isGeneratingPDF = true);
 
 // //     try {
+// //       // طلب صلاحية التخزين
+// //       bool hasPermission = await _requestStoragePermission();
+// //       if (!hasPermission) {
+// //         if (mounted) {
+// //           ScaffoldMessenger.of(context).showSnackBar(
+// //             const SnackBar(
+// //               content: Text('صلاحية التخزين مطلوبة لحفظ الملف'),
+// //               backgroundColor: Colors.red,
+// //             ),
+// //           );
+// //         }
+// //         setState(() => _isGeneratingPDF = false);
+// //         return;
+// //       }
+
+// //       // اختيار مجلد الحفظ
+// //       String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
+// //         dialogTitle: 'اختر مجلد لحفظ ملف PDF',
+// //       );
+
+// //       if (selectedDirectory == null) {
+// //         setState(() => _isGeneratingPDF = false);
+// //         return; // المستخدم ألغى الاختيار
+// //       }
+
 // //       // إنشاء PDF
 // //       final pdf = pdfLib.Document(
 // //         theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
@@ -709,15 +6863,36 @@
 // //         );
 // //       }
 
-// //       // طباعة PDF
-// //       await Printing.layoutPdf(
-// //         onLayout: (PdfPageFormat format) async => pdf.save(),
-// //         name: _getPDFFileName(),
+// //       // حفظ PDF في الملف
+// //       final pdfBytes = await pdf.save();
+
+// //       // إنشاء اسم الملف
+// //       final fileName = '${_getPDFFileName()}.pdf';
+// //       final filePath = path.join(selectedDirectory, fileName);
+
+// //       // حفظ الملف
+// //       final file = await FilePicker.platform.saveFile(
+// //         dialogTitle: 'حفظ ملف PDF',
+// //         fileName: fileName,
+// //         initialDirectory: selectedDirectory,
+// //         bytes: pdfBytes,
 // //       );
+
+// //       if (file != null && mounted) {
+// //         ScaffoldMessenger.of(context).showSnackBar(
+// //           SnackBar(
+// //             content: Text('تم حفظ الملف بنجاح في: $file'),
+// //             backgroundColor: Colors.green,
+// //             duration: const Duration(seconds: 4),
+// //           ),
+// //         );
+// //       }
 // //     } catch (e) {
-// //       ScaffoldMessenger.of(
-// //         context,
-// //       ).showSnackBar(SnackBar(content: Text('حدث خطأ في إنشاء PDF: $e')));
+// //       if (mounted) {
+// //         ScaffoldMessenger.of(
+// //           context,
+// //         ).showSnackBar(SnackBar(content: Text('حدث خطأ في حفظ PDF: $e')));
+// //       }
 // //     } finally {
 // //       setState(() => _isGeneratingPDF = false);
 // //     }
@@ -880,9 +7055,13 @@
 // //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
 // //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
 // //               children: [
-// //                 _buildCompactDataCell('${transport.companyHoliday}'),
-// //                 _buildCompactDataCell('${transport.companyOvernight}'),
-// //                 _buildCompactDataCell('${transport.nolon}'),
+// //                 _buildCompactDataCell(
+// //                   '${_formatPdfNumber(transport.companyHoliday)}',
+// //                 ),
+// //                 _buildCompactDataCell(
+// //                   '${_formatPdfNumber(transport.companyOvernight)}',
+// //                 ),
+// //                 _buildCompactDataCell('${_formatPdfNumber(transport.nolon)}'),
 // //                 _buildCompactDataCell(transport.vehicleType),
 // //                 _buildCompactDataCell(transport.unloadingLocation),
 // //                 _buildCompactDataCell(transport.loadingLocation),
@@ -940,9 +7119,15 @@
 // //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
 // //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
 // //               children: [
-// //                 _buildCompactDataCell('${transport.wheelHoliday}'),
-// //                 _buildCompactDataCell('${transport.wheelOvernight}'),
-// //                 _buildCompactDataCell('${transport.wheelNolon}'),
+// //                 _buildCompactDataCell(
+// //                   '${_formatPdfNumber(transport.wheelHoliday)}',
+// //                 ),
+// //                 _buildCompactDataCell(
+// //                   '${_formatPdfNumber(transport.wheelOvernight)}',
+// //                 ),
+// //                 _buildCompactDataCell(
+// //                   '${_formatPdfNumber(transport.wheelNolon)}',
+// //                 ),
 // //                 _buildCompactDataCell(transport.vehicleType),
 // //                 _buildCompactDataCell(transport.unloadingLocation),
 // //                 _buildCompactDataCell(transport.loadingLocation),
@@ -953,6 +7138,19 @@
 // //         ],
 // //       ),
 // //     );
+// //   }
+
+// //   // دالة لتنسيق الأرقام في PDF برقم واحد بعد العلامة العشرية
+// //   String _formatPdfNumber(double? number) {
+// //     if (number == null) return '0';
+
+// //     // إذا كان الرقم صحيحًا
+// //     if (number == number.roundToDouble()) {
+// //       return number.round().toString();
+// //     }
+
+// //     // عرض برقم واحد بعد العلامة العشرية
+// //     return number.toStringAsFixed(1);
 // //   }
 
 // //   // ================= بناء خلية رأس مضغوطة =================
@@ -1011,9 +7209,22 @@
 // //   // ================= الحصول على اسم الملف =================
 // //   String _getPDFFileName() {
 // //     final now = DateTime.now();
-// //     final formattedDate = DateFormat('yyyyMMdd').format(now);
+// //     final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(now);
 // //     final viewTypeText = _currentViewType == 'companies' ? 'شركات' : 'عجل';
 // //     return 'عروض_اسعار_${viewTypeText}_${_currentCompanyName}_$formattedDate';
+// //   }
+
+// //   // دالة لتنسيق الأرقام برقم واحد بعد العلامة العشرية
+// //   String _formatNumber(double? number) {
+// //     if (number == null) return '0';
+
+// //     // إذا كان الرقم صحيحًا (بدون كسور)
+// //     if (number == number.roundToDouble()) {
+// //       return number.round().toString();
+// //     }
+
+// //     // تقريب الرقم إلى رقم واحد بعد العلامة العشرية للعرض فقط
+// //     return number.toStringAsFixed(1);
 // //   }
 
 // //   Widget _buildCompaniesTable(List<TransportationWithOffer> transportations) {
@@ -1064,9 +7275,13 @@
 // //                     _TableCellBody(transport.loadingLocation),
 // //                     _TableCellBody(transport.unloadingLocation),
 // //                     _TableCellBody(transport.vehicleType),
-// //                     _TableCellBody('${transport.nolon} ج'),
-// //                     _TableCellBody('${transport.companyOvernight} ج'),
-// //                     _TableCellBody('${transport.companyHoliday} ج'),
+// //                     _TableCellBody('${_formatNumber(transport.nolon)} ج'),
+// //                     _TableCellBody(
+// //                       '${_formatNumber(transport.companyOvernight)} ج',
+// //                     ),
+// //                     _TableCellBody(
+// //                       '${_formatNumber(transport.companyHoliday)} ج',
+// //                     ),
 // //                     _TableCellActions(
 // //                       onEdit: () => _editTransportation(item, 'companies'),
 // //                       onDelete: () => _deleteTransportation(item),
@@ -1129,9 +7344,13 @@
 // //                     _TableCellBody(transport.loadingLocation),
 // //                     _TableCellBody(transport.unloadingLocation),
 // //                     _TableCellBody(transport.vehicleType),
-// //                     _TableCellBody('${transport.wheelNolon} ج'),
-// //                     _TableCellBody('${transport.wheelOvernight} ج'),
-// //                     _TableCellBody('${transport.wheelHoliday} ج'),
+// //                     _TableCellBody('${_formatNumber(transport.wheelNolon)} ج'),
+// //                     _TableCellBody(
+// //                       '${_formatNumber(transport.wheelOvernight)} ج',
+// //                     ),
+// //                     _TableCellBody(
+// //                       '${_formatNumber(transport.wheelHoliday)} ج',
+// //                     ),
 // //                     _TableCellActions(
 // //                       onEdit: () => _editTransportation(item, 'wheels'),
 // //                       onDelete: () => _deleteTransportation(item),
@@ -1162,18 +7381,18 @@
 // //     );
 // //     final nolonController = TextEditingController(
 // //       text: isCompaniesView
-// //           ? transportation.nolon.toString()
-// //           : transportation.wheelNolon.toString(),
+// //           ? _formatNumber(transportation.nolon)
+// //           : _formatNumber(transportation.wheelNolon),
 // //     );
 // //     final overnightController = TextEditingController(
 // //       text: isCompaniesView
-// //           ? transportation.companyOvernight.toString()
-// //           : transportation.wheelOvernight.toString(),
+// //           ? _formatNumber(transportation.companyOvernight)
+// //           : _formatNumber(transportation.wheelOvernight),
 // //     );
 // //     final holidayController = TextEditingController(
 // //       text: isCompaniesView
-// //           ? transportation.companyHoliday.toString()
-// //           : transportation.wheelHoliday.toString(),
+// //           ? _formatNumber(transportation.companyHoliday)
+// //           : _formatNumber(transportation.wheelHoliday),
 // //     );
 // //     final notesController = TextEditingController(
 // //       text: transportation.notes ?? '',
@@ -1438,23 +7657,41 @@
 // //             'notes': notes.trim().isEmpty ? null : notes.trim(),
 // //           };
 
-// //           // تحديث الحقول حسب النوع
+// //           // تحديث الحقول حسب النوع مع تقريب الأرقام
 // //           if (isCompaniesView) {
-// //             updatedMap['nolon'] =
-// //                 double.tryParse(nolon) ?? item.transportation.nolon;
-// //             updatedMap['companyOvernight'] =
-// //                 double.tryParse(overnight) ??
-// //                 item.transportation.companyOvernight;
-// //             updatedMap['companyHoliday'] =
-// //                 double.tryParse(holiday) ?? item.transportation.companyHoliday;
+// //             double? nolonValue = double.tryParse(nolon);
+// //             double? overnightValue = double.tryParse(overnight);
+// //             double? holidayValue = double.tryParse(holiday);
+
+// //             // ✅ تقريب الأرقام إلى رقم واحد بعد العلامة العشرية
+// //             updatedMap['nolon'] = nolonValue != null
+// //                 ? _roundToOneDecimal(nolonValue)
+// //                 : item.transportation.nolon;
+
+// //             updatedMap['companyOvernight'] = overnightValue != null
+// //                 ? _roundToOneDecimal(overnightValue)
+// //                 : item.transportation.companyOvernight;
+
+// //             updatedMap['companyHoliday'] = holidayValue != null
+// //                 ? _roundToOneDecimal(holidayValue)
+// //                 : item.transportation.companyHoliday;
 // //           } else {
-// //             updatedMap['wheelNolon'] =
-// //                 double.tryParse(nolon) ?? item.transportation.wheelNolon;
-// //             updatedMap['wheelOvernight'] =
-// //                 double.tryParse(overnight) ??
-// //                 item.transportation.wheelOvernight;
-// //             updatedMap['wheelHoliday'] =
-// //                 double.tryParse(holiday) ?? item.transportation.wheelHoliday;
+// //             double? nolonValue = double.tryParse(nolon);
+// //             double? overnightValue = double.tryParse(overnight);
+// //             double? holidayValue = double.tryParse(holiday);
+
+// //             // ✅ تقريب الأرقام إلى رقم واحد بعد العلامة العشرية
+// //             updatedMap['wheelNolon'] = nolonValue != null
+// //                 ? _roundToOneDecimal(nolonValue)
+// //                 : item.transportation.wheelNolon;
+
+// //             updatedMap['wheelOvernight'] = overnightValue != null
+// //                 ? _roundToOneDecimal(overnightValue)
+// //                 : item.transportation.wheelOvernight;
+
+// //             updatedMap['wheelHoliday'] = holidayValue != null
+// //                 ? _roundToOneDecimal(holidayValue)
+// //                 : item.transportation.wheelHoliday;
 // //           }
 
 // //           return updatedMap;
@@ -1530,7 +7767,7 @@
 // //                 style: const TextStyle(color: Colors.grey),
 // //               ),
 // //               Text(
-// //                 'النولون: ${item.transportation.nolon} ج',
+// //                 'النولون: ${_formatNumber(item.transportation.nolon)} ج',
 // //                 style: const TextStyle(color: Colors.grey),
 // //               ),
 // //               const SizedBox(height: 16),
@@ -1773,6 +8010,9 @@
 // import 'package:intl/intl.dart';
 // import 'package:flutter/services.dart';
 // import 'package:flutter/widgets.dart' as t;
+// import 'package:file_picker/file_picker.dart';
+// import 'package:path/path.dart' as path;
+// import 'package:permission_handler/permission_handler.dart';
 
 // class PriceOffersListScreen extends StatefulWidget {
 //   const PriceOffersListScreen({super.key});
@@ -1792,19 +8032,18 @@
 //   String? _currentCompanyId;
 //   List<TransportationWithOffer>? _currentTransportations;
 
-//   // إضافة ScrollController لإصلاح مشكلة التهنيج
-//   final ScrollController _scrollController = ScrollController();
+//   // متغير لتتبع حالة الـ Switch (true: حفظ الأرقام برقم واحد بعد العلامة، false: تقريب لأسفل)
+//   bool _keepNumbersAsIs = true;
+
+//   // دالة مساعدة لتقريب الرقم إلى رقم واحد بعد العلامة العشرية
+//   double _roundToOneDecimal(double value) {
+//     return (value * 10).roundToDouble() / 10;
+//   }
 
 //   @override
 //   void initState() {
 //     super.initState();
 //     _loadArabicFont();
-//   }
-
-//   @override
-//   void dispose() {
-//     _scrollController.dispose();
-//     super.dispose();
 //   }
 
 //   Future<void> _loadArabicFont() async {
@@ -1820,12 +8059,22 @@
 //     }
 //   }
 
+//   // دالة لطلب صلاحية التخزين
+//   Future<bool> _requestStoragePermission() async {
+//     if (await Permission.storage.request().isGranted) {
+//       return true;
+//     } else if (await Permission.manageExternalStorage.request().isGranted) {
+//       return true;
+//     } else {
+//       return false;
+//     }
+//   }
+
 //   @override
 //   Widget build(BuildContext context) {
 //     return Scaffold(
 //       backgroundColor: const Color(0xFFF4F6F8),
 //       body: SingleChildScrollView(
-//         controller: _scrollController, // إضافة الـ Controller
 //         child: Column(
 //           children: [
 //             _buildSearchAndStatsBar(),
@@ -2052,7 +8301,7 @@
 
 //         return ListView.builder(
 //           shrinkWrap: true,
-//           physics: const ClampingScrollPhysics(), // تغيير الفيزياء لمنع التهنيج
+//           physics: const NeverScrollableScrollPhysics(),
 //           padding: const EdgeInsets.all(16),
 //           itemCount: filteredCompanies.length,
 //           itemBuilder: (context, index) {
@@ -2175,10 +8424,10 @@
 //                     Row(
 //                       mainAxisSize: MainAxisSize.min,
 //                       children: [
-//                         // زر الطباعة
+//                         // زر حفظ PDF
 //                         IconButton(
-//                           icon: Icon(Icons.print, color: Colors.green[700]),
-//                           onPressed: () => _generatePDF(),
+//                           icon: Icon(Icons.save_alt, color: Colors.green[700]),
+//                           onPressed: () => _generateAndSavePDF(),
 //                         ),
 //                         // زر الإغلاق
 //                         IconButton(
@@ -2281,18 +8530,19 @@
 
 //                 const SizedBox(height: 16),
 
-//                 // زر الإغلاق
+//                 // أزرار الإجراءات
 //                 Row(
 //                   mainAxisAlignment: MainAxisAlignment.center,
 //                   children: [
+//                     // زر رفع الأسعار
 //                     ElevatedButton(
-//                       onPressed: () => _generatePDF(),
+//                       onPressed: () => _showIncreasePricesDialog(viewType),
 //                       style: ElevatedButton.styleFrom(
-//                         backgroundColor: const Color.fromARGB(255, 255, 0, 0),
+//                         backgroundColor: Colors.orange,
 //                         foregroundColor: Colors.white,
 //                         elevation: 2,
 //                         padding: const EdgeInsets.symmetric(
-//                           horizontal: 40,
+//                           horizontal: 30,
 //                           vertical: 12,
 //                         ),
 //                         shape: RoundedRectangleBorder(
@@ -2302,13 +8552,45 @@
 //                       child: Row(
 //                         children: [
 //                           Icon(
-//                             Icons.print,
+//                             Icons.trending_up,
 //                             color: const Color.fromARGB(255, 255, 255, 255),
 //                           ),
+//                           const SizedBox(width: 8),
+//                           const Text('رفع الأسعار'),
 //                         ],
 //                       ),
 //                     ),
 //                     const SizedBox(width: 10),
+
+//                     // زر حفظ PDF
+//                     ElevatedButton(
+//                       onPressed: () => _generateAndSavePDF(),
+//                       style: ElevatedButton.styleFrom(
+//                         backgroundColor: Colors.green,
+//                         foregroundColor: Colors.white,
+//                         elevation: 2,
+//                         padding: const EdgeInsets.symmetric(
+//                           horizontal: 30,
+//                           vertical: 12,
+//                         ),
+//                         shape: RoundedRectangleBorder(
+//                           borderRadius: BorderRadius.circular(8),
+//                         ),
+//                       ),
+//                       child: Row(
+//                         children: [
+//                           Icon(
+//                             Icons.save_alt,
+//                             color: const Color.fromARGB(255, 255, 255, 255),
+//                           ),
+//                           const SizedBox(width: 8),
+//                           const Text('حفظ PDF'),
+//                         ],
+//                       ),
+//                     ),
+//                     const SizedBox(width: 10),
+
+//                     // زر الإغلاق
 //                     ElevatedButton(
 //                       onPressed: () => Navigator.pop(context),
 //                       style: ElevatedButton.styleFrom(
@@ -2333,6 +8615,330 @@
 //         ),
 //       ),
 //     );
+//   }
+
+//   // عرض نافذة رفع الأسعار
+//   void _showIncreasePricesDialog(String viewType) {
+//     final TextEditingController percentageController = TextEditingController();
+//     bool keepNumbersAsIs =
+//         _keepNumbersAsIs; // القيمة الافتراضية من المتغير العام
+
+//     showDialog(
+//       context: context,
+//       builder: (context) => Directionality(
+//         textDirection: t.TextDirection.rtl,
+//         child: StatefulBuilder(
+//           builder: (context, setState) {
+//             return AlertDialog(
+//               backgroundColor: Colors.white,
+//               shape: RoundedRectangleBorder(
+//                 borderRadius: BorderRadius.circular(16),
+//               ),
+//               title: Row(
+//                 children: [
+//                   Icon(Icons.trending_up, color: Colors.orange[700]),
+//                   const SizedBox(width: 8),
+//                   Text(
+//                     viewType == 'companies'
+//                         ? 'رفع أسعار الشركات'
+//                         : 'رفع أسعار العجل',
+//                     style: const TextStyle(
+//                       fontWeight: FontWeight.bold,
+//                       color: Color(0xFF2C3E50),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               content: Column(
+//                 mainAxisSize: MainAxisSize.min,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     viewType == 'companies'
+//                         ? 'سيتم رفع أسعار النولون، المبيت، والعطلة لجميع عروض الشركات بنسبة:'
+//                         : 'سيتم رفع أسعار النولون، المبيت، والعطلة لجميع عروض العجل بنسبة:',
+//                     style: const TextStyle(fontSize: 14),
+//                   ),
+//                   const SizedBox(height: 16),
+//                   TextFormField(
+//                     controller: percentageController,
+//                     keyboardType: TextInputType.number,
+//                     decoration: InputDecoration(
+//                       hintText: 'أدخل النسبة المؤوية (مثال: 10)',
+//                       prefixIcon: const Icon(
+//                         Icons.percent,
+//                         color: Color(0xFF3498DB),
+//                       ),
+//                       filled: true,
+//                       fillColor: const Color(0xFFF4F6F8),
+//                       border: OutlineInputBorder(
+//                         borderRadius: BorderRadius.circular(8),
+//                         borderSide: BorderSide.none,
+//                       ),
+//                       contentPadding: const EdgeInsets.symmetric(
+//                         horizontal: 16,
+//                         vertical: 12,
+//                       ),
+//                     ),
+//                   ),
+//                   const SizedBox(height: 16),
+
+//                   // ✅ إضافة الـ Switch للتحكم في طريقة حفظ الأرقام
+//                   Container(
+//                     padding: const EdgeInsets.all(12),
+//                     decoration: BoxDecoration(
+//                       color: const Color(0xFFF4F6F8),
+//                       borderRadius: BorderRadius.circular(8),
+//                       border: Border.all(
+//                         color: const Color(0xFF3498DB).withOpacity(0.3),
+//                       ),
+//                     ),
+//                     child: Row(
+//                       children: [
+//                         Icon(
+//                           Icons.circle,
+//                           size: 12,
+//                           color: keepNumbersAsIs ? Colors.green : Colors.orange,
+//                         ),
+//                         const SizedBox(width: 12),
+//                         Expanded(
+//                           child: Column(
+//                             crossAxisAlignment: CrossAxisAlignment.start,
+//                             children: [
+//                               const Text(
+//                                 'طريقة حفظ الأرقام',
+//                                 style: TextStyle(
+//                                   fontWeight: FontWeight.bold,
+//                                   fontSize: 14,
+//                                 ),
+//                               ),
+//                               const SizedBox(height: 2),
+//                               Text(
+//                                 keepNumbersAsIs
+//                                     ? '✅ (10.5)زياده مع وجود كسور'
+//                                     : '⬇️ (10)زياده مع الغاء كسور',
+//                                 style: TextStyle(
+//                                   fontSize: 11,
+//                                   color: keepNumbersAsIs
+//                                       ? Colors.green[700]
+//                                       : Colors.orange[700],
+//                                   fontWeight: FontWeight.w500,
+//                                 ),
+//                               ),
+//                               const SizedBox(height: 4),
+//                               Text(
+//                                 keepNumbersAsIs
+//                                     ? 'مثال: 11.6 ← 11.6'
+//                                     : 'مثال: 11.6 ← 11',
+//                                 style: TextStyle(
+//                                   fontSize: 10,
+//                                   color: Colors.grey[600],
+//                                   fontStyle: FontStyle.italic,
+//                                 ),
+//                               ),
+//                             ],
+//                           ),
+//                         ),
+//                         Switch(
+//                           value: keepNumbersAsIs,
+//                           onChanged: (value) {
+//                             setState(() {
+//                               keepNumbersAsIs = value;
+//                             });
+//                           },
+//                           activeColor: Colors.green,
+//                           inactiveThumbColor: Colors.orange,
+//                           inactiveTrackColor: Colors.orange.withOpacity(0.5),
+//                         ),
+//                       ],
+//                     ),
+//                   ),
+
+//                   const SizedBox(height: 8),
+//                   const Text(
+//                     'ملاحظة: سيتم تطبيق الزيادة على جميع الأسعار الحالية',
+//                     style: TextStyle(fontSize: 12, color: Colors.grey),
+//                   ),
+//                 ],
+//               ),
+//               actions: [
+//                 TextButton(
+//                   onPressed: () => Navigator.pop(context),
+//                   child: const Text(
+//                     'إلغاء',
+//                     style: TextStyle(color: Color(0xFF2C3E50)),
+//                   ),
+//                 ),
+//                 ElevatedButton(
+//                   onPressed: () async {
+//                     final percentage = double.tryParse(
+//                       percentageController.text,
+//                     );
+//                     if (percentage == null || percentage <= 0) {
+//                       ScaffoldMessenger.of(context).showSnackBar(
+//                         const SnackBar(
+//                           content: Text('الرجاء إدخال نسبة صحيحة أكبر من صفر'),
+//                           backgroundColor: Colors.red,
+//                         ),
+//                       );
+//                       return;
+//                     }
+
+//                     Navigator.pop(context);
+
+//                     // ✅ تحديث الحالة العامة وتنفيذ رفع الأسعار مع خيار حفظ الأرقام
+//                     setState(() {
+//                       _keepNumbersAsIs = keepNumbersAsIs;
+//                     });
+
+//                     await _increasePrices(
+//                       percentage,
+//                       viewType,
+//                       keepNumbersAsIs,
+//                     );
+//                   },
+//                   style: ElevatedButton.styleFrom(
+//                     backgroundColor: Colors.orange,
+//                     foregroundColor: Colors.white,
+//                   ),
+//                   child: const Text('رفع الأسعار'),
+//                 ),
+//               ],
+//             );
+//           },
+//         ),
+//       ),
+//     );
+//   }
+
+//   // دالة رفع الأسعار
+//   Future<void> _increasePrices(
+//     double percentage,
+//     String viewType,
+//     bool keepNumbersAsIs,
+//   ) async {
+//     try {
+//       if (_currentCompanyId == null) return;
+
+//       setState(() => _isGeneratingPDF = true);
+
+//       final percentageFactor = 1 + (percentage / 100);
+
+//       // جلب جميع العروض
+//       final offersSnapshot = await _firestore
+//           .collection('companies')
+//           .doc(_currentCompanyId!)
+//           .collection('priceOffers')
+//           .get();
+
+//       // تحديث كل عرض
+//       for (final offerDoc in offersSnapshot.docs) {
+//         final offerData = offerDoc.data();
+//         final List<dynamic> transportations = List.from(
+//           offerData['transportations'] ?? [],
+//         );
+
+//         // تحديث كل رحلة في العرض
+//         final updatedTransportations = transportations.map((transport) {
+//           final Map<String, dynamic> updatedTransport =
+//               Map<String, dynamic>.from(transport);
+
+//           if (viewType == 'companies') {
+//             // رفع أسعار الشركات
+//             if (updatedTransport['nolon'] != null) {
+//               double value =
+//                   (updatedTransport['nolon'] as num) * percentageFactor;
+//               // ✅ تقريب الرقم إلى رقم واحد بعد العلامة العشرية
+//               double roundedValue = _roundToOneDecimal(value);
+//               updatedTransport['nolon'] = keepNumbersAsIs
+//                   ? roundedValue
+//                   : value.floor().toDouble();
+//             }
+//             if (updatedTransport['companyOvernight'] != null) {
+//               double value =
+//                   (updatedTransport['companyOvernight'] as num) *
+//                   percentageFactor;
+//               double roundedValue = _roundToOneDecimal(value);
+//               updatedTransport['companyOvernight'] = keepNumbersAsIs
+//                   ? roundedValue
+//                   : value.floor().toDouble();
+//             }
+//             if (updatedTransport['companyHoliday'] != null) {
+//               double value =
+//                   (updatedTransport['companyHoliday'] as num) *
+//                   percentageFactor;
+//               double roundedValue = _roundToOneDecimal(value);
+//               updatedTransport['companyHoliday'] = keepNumbersAsIs
+//                   ? roundedValue
+//                   : value.floor().toDouble();
+//             }
+//           } else {
+//             // رفع أسعار العجل
+//             if (updatedTransport['wheelNolon'] != null) {
+//               double value =
+//                   (updatedTransport['wheelNolon'] as num) * percentageFactor;
+//               double roundedValue = _roundToOneDecimal(value);
+//               updatedTransport['wheelNolon'] = keepNumbersAsIs
+//                   ? roundedValue
+//                   : value.floor().toDouble();
+//             }
+//             if (updatedTransport['wheelOvernight'] != null) {
+//               double value =
+//                   (updatedTransport['wheelOvernight'] as num) *
+//                   percentageFactor;
+//               double roundedValue = _roundToOneDecimal(value);
+//               updatedTransport['wheelOvernight'] = keepNumbersAsIs
+//                   ? roundedValue
+//                   : value.floor().toDouble();
+//             }
+//             if (updatedTransport['wheelHoliday'] != null) {
+//               double value =
+//                   (updatedTransport['wheelHoliday'] as num) * percentageFactor;
+//               double roundedValue = _roundToOneDecimal(value);
+//               updatedTransport['wheelHoliday'] = keepNumbersAsIs
+//                   ? roundedValue
+//                   : value.floor().toDouble();
+//             }
+//           }
+
+//           return updatedTransport;
+//         }).toList();
+
+//         // تحديث العرض في Firebase
+//         await offerDoc.reference.update({
+//           'transportations': updatedTransportations,
+//           'updatedAt': Timestamp.now(),
+//         });
+//       }
+
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//             content: Text(
+//               'تم رفع الأسعار بنسبة ${percentage.toStringAsFixed(2)}% بنجاح' +
+//                   (keepNumbersAsIs
+//                       ? ' (تم حفظ الأرقام برقم واحد بعد العلامة)'
+//                       : ' (تم تقريب الأرقام لأسفل)'),
+//             ),
+//             backgroundColor: Colors.green,
+//             duration: const Duration(seconds: 3),
+//           ),
+//         );
+//       }
+//     } catch (e) {
+//       print('Error increasing prices: $e');
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//             content: Text('خطأ في رفع الأسعار: $e'),
+//             backgroundColor: Colors.red,
+//             duration: const Duration(seconds: 3),
+//           ),
+//         );
+//       }
+//     } finally {
+//       setState(() => _isGeneratingPDF = false);
+//     }
 //   }
 
 //   Widget _buildCompanyOffersTable(String companyId, String viewType) {
@@ -2401,28 +9007,6 @@
 //           }
 //         }
 
-//         // ✅ ترتيب البيانات أبجديًا حسب: مكان التحميل → مكان التعتيق → نوع العربيه
-//         allTransportations.sort((a, b) {
-//           final aLoading = a.transportation.loadingLocation.toLowerCase();
-//           final bLoading = b.transportation.loadingLocation.toLowerCase();
-
-//           if (aLoading != bLoading) {
-//             return aLoading.compareTo(bLoading);
-//           }
-
-//           final aUnloading = a.transportation.unloadingLocation.toLowerCase();
-//           final bUnloading = b.transportation.unloadingLocation.toLowerCase();
-
-//           if (aUnloading != bUnloading) {
-//             return aUnloading.compareTo(bUnloading);
-//           }
-
-//           final aVehicle = a.transportation.vehicleType.toLowerCase();
-//           final bVehicle = b.transportation.vehicleType.toLowerCase();
-
-//           return aVehicle.compareTo(bVehicle);
-//         });
-
 //         // حفظ البيانات للطباعة
 //         _currentTransportations = allTransportations;
 
@@ -2433,8 +9017,8 @@
 //     );
 //   }
 
-//   // ================= إنشاء PDF =================
-//   Future<void> _generatePDF() async {
+//   // ================= إنشاء وحفظ PDF =================
+//   Future<void> _generateAndSavePDF() async {
 //     if (_arabicFont == null) {
 //       ScaffoldMessenger.of(
 //         context,
@@ -2444,25 +9028,63 @@
 
 //     if (_currentCompanyName == null ||
 //         _currentViewType == null ||
-//         _currentTransportations == null) {
+//         _currentTransportations == null ||
+//         _currentTransportations!.isEmpty) {
 //       ScaffoldMessenger.of(
 //         context,
-//       ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للطباعة')));
+//       ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للحفظ')));
 //       return;
 //     }
 
 //     setState(() => _isGeneratingPDF = true);
 
 //     try {
+//       // طلب صلاحية التخزين
+//       bool hasPermission = await _requestStoragePermission();
+//       if (!hasPermission) {
+//         if (mounted) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             const SnackBar(
+//               content: Text('صلاحية التخزين مطلوبة لحفظ الملف'),
+//               backgroundColor: Colors.red,
+//             ),
+//           );
+//         }
+//         setState(() => _isGeneratingPDF = false);
+//         return;
+//       }
+
+//       // اختيار مجلد الحفظ
+//       String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
+//         dialogTitle: 'اختر مجلد لحفظ ملف PDF',
+//       );
+
+//       if (selectedDirectory == null) {
+//         setState(() => _isGeneratingPDF = false);
+//         return;
+//       }
+
 //       // إنشاء PDF
 //       final pdf = pdfLib.Document(
 //         theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
 //       );
 
-//       // تقسيم البيانات إلى صفحات (25 صف لكل صفحة)
+//       // تقسيم البيانات إلى صفحات
 //       final pages = _splitDataIntoPages(_currentTransportations!);
 
+//       // التحقق من صحة التقسيم
+//       int totalRowsInPages = 0;
+//       for (var page in pages) {
+//         totalRowsInPages += page.length;
+//       }
+
+//       debugPrint('إجمالي الصفوف: ${_currentTransportations!.length}');
+//       debugPrint('عدد الصفوف في الصفحات: $totalRowsInPages');
+//       debugPrint('عدد الصفحات: ${pages.length}');
+
 //       for (int pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+//         final currentPageData = pages[pageIndex];
+
 //         pdf.addPage(
 //           pdfLib.Page(
 //             pageFormat: PdfPageFormat.a4,
@@ -2471,7 +9093,7 @@
 //               return pdfLib.Column(
 //                 crossAxisAlignment: pdfLib.CrossAxisAlignment.stretch,
 //                 children: [
-//                   // 1. الهيدر - أعلى الصفحة مباشرة
+//                   // 1. الهيدر
 //                   _buildPdfHeader(),
 //                   pdfLib.SizedBox(height: 10),
 
@@ -2479,24 +9101,24 @@
 //                   _buildPdfTitle(),
 //                   pdfLib.SizedBox(height: 10),
 
-//                   // 3. إحصائيات العدد
-//                   _buildPdfStats(_currentTransportations!.length),
-//                   pdfLib.SizedBox(height: 10),
+//                   // 3. إحصائيات العدد (في الصفحة الأولى فقط)
+//                   if (pageIndex == 0)
+//                     _buildPdfStats(_currentTransportations!.length),
+//                   if (pageIndex == 0) pdfLib.SizedBox(height: 10),
 
-//                   // 4. الجدول - يأخذ المساحة المتبقية
+//                   // 4. الجدول
 //                   pdfLib.Expanded(
 //                     child: _currentViewType == 'companies'
 //                         ? _buildCompaniesPdfTablePage(
-//                             pages[pageIndex],
+//                             currentPageData,
 //                             pageIndex,
 //                           )
-//                         : _buildWheelsPdfTablePage(pages[pageIndex], pageIndex),
+//                         : _buildWheelsPdfTablePage(currentPageData, pageIndex),
 //                   ),
 
-//                   // 5. رقم الصفحة (إذا كان هناك أكثر من صفحة)
-//                   if (pages.length > 1) pdfLib.SizedBox(height: 15),
-//                   if (pages.length > 1)
-//                     _buildPageNumber(pageIndex + 1, pages.length),
+//                   // 5. رقم الصفحة
+//                   pdfLib.SizedBox(height: 10),
+//                   _buildPageNumber(pageIndex + 1, pages.length),
 //                 ],
 //               );
 //             },
@@ -2504,38 +9126,59 @@
 //         );
 //       }
 
-//       // طباعة PDF
-//       await Printing.layoutPdf(
-//         onLayout: (PdfPageFormat format) async => pdf.save(),
-//         name: _getPDFFileName(),
+//       // حفظ PDF في الملف
+//       final pdfBytes = await pdf.save();
+
+//       // إنشاء اسم الملف
+//       final fileName = '${_getPDFFileName()}.pdf';
+//       final filePath = path.join(selectedDirectory, fileName);
+
+//       // حفظ الملف
+//       final file = await FilePicker.platform.saveFile(
+//         dialogTitle: 'حفظ ملف PDF',
+//         fileName: fileName,
+//         initialDirectory: selectedDirectory,
+//         bytes: pdfBytes,
 //       );
+
+//       if (file != null && mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//             content: Text(
+//               'تم حفظ الملف بنجاح في: $file\nعدد الصفوف: ${_currentTransportations!.length} في ${pages.length} صفحات',
+//             ),
+//             backgroundColor: Colors.green,
+//             duration: const Duration(seconds: 5),
+//           ),
+//         );
+//       }
 //     } catch (e) {
-//       ScaffoldMessenger.of(
-//         context,
-//       ).showSnackBar(SnackBar(content: Text('حدث خطأ في إنشاء PDF: $e')));
+//       if (mounted) {
+//         ScaffoldMessenger.of(
+//           context,
+//         ).showSnackBar(SnackBar(content: Text('حدث خطأ في حفظ PDF: $e')));
+//       }
+//       debugPrint('خطأ في حفظ PDF: $e');
 //     } finally {
 //       setState(() => _isGeneratingPDF = false);
 //     }
 //   }
 
-//   // ================= تقسيم البيانات إلى صفحات =================
+//   // ================= تقسيم البيانات إلى صفحات بشكل صحيح =================
 //   List<List<TransportationWithOffer>> _splitDataIntoPages(
 //     List<TransportationWithOffer> transportations,
 //   ) {
 //     List<List<TransportationWithOffer>> pages = [];
-//     List<TransportationWithOffer> currentPage = [];
 
-//     // حوالي 25-30 صف لكل صفحة A4
-//     int rowsPerPage = 25;
+//     // عدد الصفوف في كل صفحة
+//     const int rowsPerPage = 25;
 
-//     for (int i = 0; i < transportations.length; i++) {
-//       currentPage.add(transportations[i]);
-
-//       // إذا وصلنا إلى العدد المحدد أو كانت آخر دفعة
-//       if ((i + 1) % rowsPerPage == 0 || i == transportations.length - 1) {
-//         pages.add(List.from(currentPage));
-//         currentPage.clear();
+//     for (int i = 0; i < transportations.length; i += rowsPerPage) {
+//       int end = i + rowsPerPage;
+//       if (end > transportations.length) {
+//         end = transportations.length;
 //       }
+//       pages.add(transportations.sublist(i, end));
 //     }
 
 //     return pages;
@@ -2578,7 +9221,7 @@
 //       child: pdfLib.Column(
 //         children: [
 //           pdfLib.Text(
-//             _currentCompanyName!,
+//             _currentCompanyName ?? 'غير معروف',
 //             style: pdfLib.TextStyle(
 //               fontSize: 16,
 //               fontWeight: pdfLib.FontWeight.bold,
@@ -2617,7 +9260,7 @@
 //               ),
 //             ),
 //             pdfLib.Text(
-//               '$total',
+//               total.toString(),
 //               style: pdfLib.TextStyle(
 //                 fontSize: 16,
 //                 fontWeight: pdfLib.FontWeight.bold,
@@ -2635,18 +9278,21 @@
 //     List<TransportationWithOffer> transportations,
 //     int pageIndex,
 //   ) {
+//     // حساب رقم البداية الصحيح لهذه الصفحة
+//     int startIndex = pageIndex * 25;
+
 //     return pdfLib.Directionality(
 //       textDirection: pdfLib.TextDirection.rtl,
 //       child: pdfLib.Table(
 //         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
 //         columnWidths: {
-//           6: pdfLib.FlexColumnWidth(0.4), // م
-//           5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
-//           4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
+//           0: pdfLib.FlexColumnWidth(0.4), // م
+//           1: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
+//           2: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
 //           3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
-//           2: pdfLib.FlexColumnWidth(1.0), // النولون
-//           1: pdfLib.FlexColumnWidth(1.0), // المبيت
-//           0: pdfLib.FlexColumnWidth(1.0), // العطلة
+//           4: pdfLib.FlexColumnWidth(1.0), // النولون
+//           5: pdfLib.FlexColumnWidth(1.0), // المبيت
+//           6: pdfLib.FlexColumnWidth(1.0), // العطلة
 //         },
 //         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
 //         children: [
@@ -2654,19 +9300,20 @@
 //           pdfLib.TableRow(
 //             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
 //             children: [
-//               _buildCompactHeaderCell('العطلة'),
-//               _buildCompactHeaderCell('المبيت'),
-//               _buildCompactHeaderCell('النولون'),
-//               _buildCompactHeaderCell('نوع العربية'),
-//               _buildCompactHeaderCell('مكان التعتيق'),
-//               _buildCompactHeaderCell('مكان التحميل'),
 //               _buildCompactHeaderCell('م'),
+//               _buildCompactHeaderCell('مكان التحميل'),
+//               _buildCompactHeaderCell('مكان التعتيق'),
+//               _buildCompactHeaderCell('نوع العربية'),
+//               _buildCompactHeaderCell('النولون'),
+//               _buildCompactHeaderCell('المبيت'),
+//               _buildCompactHeaderCell('العطلة'),
 //             ],
 //           ),
 
 //           // بيانات الجدول
 //           ...transportations.asMap().entries.map((entry) {
-//             int index = (pageIndex * 25) + entry.key + 1;
+//             // الرقم المسلسل الصحيح = بداية الصفحة + رقم العنصر في الصفحة + 1
+//             int index = startIndex + entry.key + 1;
 //             final item = entry.value;
 //             final transport = item.transportation;
 
@@ -2675,16 +9322,20 @@
 //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
 //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
 //               children: [
-//                 _buildCompactDataCell('${transport.companyHoliday}'),
-//                 _buildCompactDataCell('${transport.companyOvernight}'),
-//                 _buildCompactDataCell('${transport.nolon}'),
-//                 _buildCompactDataCell(transport.vehicleType),
-//                 _buildCompactDataCell(transport.unloadingLocation),
-//                 _buildCompactDataCell(transport.loadingLocation),
 //                 _buildCompactDataCell(index.toString()),
+//                 _buildCompactDataCell(transport.loadingLocation),
+//                 _buildCompactDataCell(transport.unloadingLocation),
+//                 _buildCompactDataCell(transport.vehicleType),
+//                 _buildCompactDataCell(_formatPdfNumber(transport.nolon)),
+//                 _buildCompactDataCell(
+//                   _formatPdfNumber(transport.companyOvernight),
+//                 ),
+//                 _buildCompactDataCell(
+//                   _formatPdfNumber(transport.companyHoliday),
+//                 ),
 //               ],
 //             );
-//           }),
+//           }).toList(),
 //         ],
 //       ),
 //     );
@@ -2695,18 +9346,21 @@
 //     List<TransportationWithOffer> transportations,
 //     int pageIndex,
 //   ) {
+//     // حساب رقم البداية الصحيح لهذه الصفحة
+//     int startIndex = pageIndex * 25;
+
 //     return pdfLib.Directionality(
 //       textDirection: pdfLib.TextDirection.rtl,
 //       child: pdfLib.Table(
 //         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
 //         columnWidths: {
-//           6: pdfLib.FlexColumnWidth(0.4), // م
-//           5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
-//           4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
+//           0: pdfLib.FlexColumnWidth(0.4), // م
+//           1: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
+//           2: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
 //           3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
-//           2: pdfLib.FlexColumnWidth(1.0), // النولون
-//           1: pdfLib.FlexColumnWidth(1.0), // المبيت
-//           0: pdfLib.FlexColumnWidth(1.0), // العطلة
+//           4: pdfLib.FlexColumnWidth(1.0), // النولون
+//           5: pdfLib.FlexColumnWidth(1.0), // المبيت
+//           6: pdfLib.FlexColumnWidth(1.0), // العطلة
 //         },
 //         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
 //         children: [
@@ -2714,19 +9368,20 @@
 //           pdfLib.TableRow(
 //             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
 //             children: [
-//               _buildCompactHeaderCell('العطلة'),
-//               _buildCompactHeaderCell('المبيت'),
-//               _buildCompactHeaderCell('النولون'),
-//               _buildCompactHeaderCell('نوع العربية'),
-//               _buildCompactHeaderCell('مكان التعتيق'),
-//               _buildCompactHeaderCell('مكان التحميل'),
 //               _buildCompactHeaderCell('م'),
+//               _buildCompactHeaderCell('مكان التحميل'),
+//               _buildCompactHeaderCell('مكان التعتيق'),
+//               _buildCompactHeaderCell('نوع العربية'),
+//               _buildCompactHeaderCell('النولون'),
+//               _buildCompactHeaderCell('المبيت'),
+//               _buildCompactHeaderCell('العطلة'),
 //             ],
 //           ),
 
 //           // بيانات الجدول
 //           ...transportations.asMap().entries.map((entry) {
-//             int index = (pageIndex * 25) + entry.key + 1;
+//             // الرقم المسلسل الصحيح = بداية الصفحة + رقم العنصر في الصفحة + 1
+//             int index = startIndex + entry.key + 1;
 //             final item = entry.value;
 //             final transport = item.transportation;
 
@@ -2735,19 +9390,49 @@
 //                   ? pdfLib.BoxDecoration(color: PdfColors.white)
 //                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
 //               children: [
-//                 _buildCompactDataCell('${transport.wheelHoliday}'),
-//                 _buildCompactDataCell('${transport.wheelOvernight}'),
-//                 _buildCompactDataCell('${transport.wheelNolon}'),
-//                 _buildCompactDataCell(transport.vehicleType),
-//                 _buildCompactDataCell(transport.unloadingLocation),
-//                 _buildCompactDataCell(transport.loadingLocation),
 //                 _buildCompactDataCell(index.toString()),
+//                 _buildCompactDataCell(transport.loadingLocation),
+//                 _buildCompactDataCell(transport.unloadingLocation),
+//                 _buildCompactDataCell(transport.vehicleType),
+//                 _buildCompactDataCell(_formatPdfNumber(transport.wheelNolon)),
+//                 _buildCompactDataCell(
+//                   _formatPdfNumber(transport.wheelOvernight),
+//                 ),
+//                 _buildCompactDataCell(_formatPdfNumber(transport.wheelHoliday)),
 //               ],
 //             );
-//           }),
+//           }).toList(),
 //         ],
 //       ),
 //     );
+//   }
+
+//   // دالة لتنسيق الأرقام في PDF
+//   String _formatPdfNumber(dynamic number) {
+//     if (number == null) return '0';
+
+//     // تحويل إلى double إذا كان الرقم ليس رقمياً
+//     double numValue;
+//     if (number is double) {
+//       numValue = number;
+//     } else if (number is int) {
+//       numValue = number.toDouble();
+//     } else {
+//       // محاولة تحويل النص إلى رقم
+//       try {
+//         numValue = double.parse(number.toString());
+//       } catch (e) {
+//         return '0';
+//       }
+//     }
+
+//     // إذا كان الرقم صحيحًا (بدون كسور)
+//     if (numValue == numValue.roundToDouble()) {
+//       return numValue.round().toString();
+//     }
+
+//     // عرض برقم واحد بعد العلامة العشرية
+//     return numValue.toStringAsFixed(1);
 //   }
 
 //   // ================= بناء خلية رأس مضغوطة =================
@@ -2764,6 +9449,7 @@
 //         ),
 //         textAlign: pdfLib.TextAlign.center,
 //         maxLines: 2,
+//         overflow: pdfLib.TextOverflow.visible,
 //       ),
 //     );
 //   }
@@ -2781,6 +9467,7 @@
 //         ),
 //         textAlign: pdfLib.TextAlign.center,
 //         maxLines: 2,
+//         overflow: pdfLib.TextOverflow.visible,
 //       ),
 //     );
 //   }
@@ -2806,9 +9493,37 @@
 //   // ================= الحصول على اسم الملف =================
 //   String _getPDFFileName() {
 //     final now = DateTime.now();
-//     final formattedDate = DateFormat('yyyyMMdd').format(now);
+//     final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(now);
 //     final viewTypeText = _currentViewType == 'companies' ? 'شركات' : 'عجل';
 //     return 'عروض_اسعار_${viewTypeText}_${_currentCompanyName}_$formattedDate';
+//   }
+
+//   // دالة لتنسيق الأرقام للعرض في الواجهة
+//   String _formatNumber(dynamic number) {
+//     if (number == null) return '0';
+
+//     // تحويل إلى double إذا كان الرقم ليس رقمياً
+//     double numValue;
+//     if (number is double) {
+//       numValue = number;
+//     } else if (number is int) {
+//       numValue = number.toDouble();
+//     } else {
+//       // محاولة تحويل النص إلى رقم
+//       try {
+//         numValue = double.parse(number.toString());
+//       } catch (e) {
+//         return '0';
+//       }
+//     }
+
+//     // إذا كان الرقم صحيحًا (بدون كسور)
+//     if (numValue == numValue.roundToDouble()) {
+//       return numValue.round().toString();
+//     }
+
+//     // عرض برقم واحد بعد العلامة العشرية
+//     return numValue.toStringAsFixed(1);
 //   }
 
 //   Widget _buildCompaniesTable(List<TransportationWithOffer> transportations) {
@@ -2821,12 +9536,11 @@
 //         scrollDirection: Axis.horizontal,
 //         child: SingleChildScrollView(
 //           scrollDirection: Axis.vertical,
-//           physics: const ClampingScrollPhysics(), // ✅ حل مشكلة التهنيج
 //           child: Table(
 //             defaultColumnWidth: const FixedColumnWidth(150),
 //             border: TableBorder.all(color: const Color(0xFF3498DB), width: 1),
 //             children: [
-//               /// ✅ العناوين - جدول الشركات
+//               /// العناوين - جدول الشركات
 //               TableRow(
 //                 decoration: BoxDecoration(
 //                   color: const Color(0xFF3498DB).withOpacity(0.15),
@@ -2843,7 +9557,7 @@
 //                 ],
 //               ),
 
-//               /// ✅ الصفوف - جدول الشركات
+//               /// الصفوف - جدول الشركات
 //               ...transportations.asMap().entries.map((entry) {
 //                 final index = entry.key;
 //                 final item = entry.value;
@@ -2860,9 +9574,13 @@
 //                     _TableCellBody(transport.loadingLocation),
 //                     _TableCellBody(transport.unloadingLocation),
 //                     _TableCellBody(transport.vehicleType),
-//                     _TableCellBody('${transport.nolon} ج'),
-//                     _TableCellBody('${transport.companyOvernight} ج'),
-//                     _TableCellBody('${transport.companyHoliday} ج'),
+//                     _TableCellBody('${_formatNumber(transport.nolon)} ج'),
+//                     _TableCellBody(
+//                       '${_formatNumber(transport.companyOvernight)} ج',
+//                     ),
+//                     _TableCellBody(
+//                       '${_formatNumber(transport.companyHoliday)} ج',
+//                     ),
 //                     _TableCellActions(
 //                       onEdit: () => _editTransportation(item, 'companies'),
 //                       onDelete: () => _deleteTransportation(item),
@@ -2887,12 +9605,11 @@
 //         scrollDirection: Axis.horizontal,
 //         child: SingleChildScrollView(
 //           scrollDirection: Axis.vertical,
-//           physics: const ClampingScrollPhysics(), // ✅ حل مشكلة التهنيج
 //           child: Table(
 //             defaultColumnWidth: const FixedColumnWidth(150),
 //             border: TableBorder.all(color: const Color(0xFF6A1B9A), width: 1),
 //             children: [
-//               /// ✅ العناوين - جدول العجل
+//               /// العناوين - جدول العجل
 //               TableRow(
 //                 decoration: BoxDecoration(
 //                   color: const Color(0xFF6A1B9A).withOpacity(0.15),
@@ -2909,7 +9626,7 @@
 //                 ],
 //               ),
 
-//               /// ✅ الصفوف - جدول العجل
+//               /// الصفوف - جدول العجل
 //               ...transportations.asMap().entries.map((entry) {
 //                 final index = entry.key;
 //                 final item = entry.value;
@@ -2926,9 +9643,13 @@
 //                     _TableCellBody(transport.loadingLocation),
 //                     _TableCellBody(transport.unloadingLocation),
 //                     _TableCellBody(transport.vehicleType),
-//                     _TableCellBody('${transport.wheelNolon} ج'),
-//                     _TableCellBody('${transport.wheelOvernight} ج'),
-//                     _TableCellBody('${transport.wheelHoliday} ج'),
+//                     _TableCellBody('${_formatNumber(transport.wheelNolon)} ج'),
+//                     _TableCellBody(
+//                       '${_formatNumber(transport.wheelOvernight)} ج',
+//                     ),
+//                     _TableCellBody(
+//                       '${_formatNumber(transport.wheelHoliday)} ج',
+//                     ),
 //                     _TableCellActions(
 //                       onEdit: () => _editTransportation(item, 'wheels'),
 //                       onDelete: () => _deleteTransportation(item),
@@ -2959,18 +9680,18 @@
 //     );
 //     final nolonController = TextEditingController(
 //       text: isCompaniesView
-//           ? transportation.nolon.toString()
-//           : transportation.wheelNolon.toString(),
+//           ? _formatNumber(transportation.nolon)
+//           : _formatNumber(transportation.wheelNolon),
 //     );
 //     final overnightController = TextEditingController(
 //       text: isCompaniesView
-//           ? transportation.companyOvernight.toString()
-//           : transportation.wheelOvernight.toString(),
+//           ? _formatNumber(transportation.companyOvernight)
+//           : _formatNumber(transportation.wheelOvernight),
 //     );
 //     final holidayController = TextEditingController(
 //       text: isCompaniesView
-//           ? transportation.companyHoliday.toString()
-//           : transportation.wheelHoliday.toString(),
+//           ? _formatNumber(transportation.companyHoliday)
+//           : _formatNumber(transportation.wheelHoliday),
 //     );
 //     final notesController = TextEditingController(
 //       text: transportation.notes ?? '',
@@ -3235,23 +9956,41 @@
 //             'notes': notes.trim().isEmpty ? null : notes.trim(),
 //           };
 
-//           // تحديث الحقول حسب النوع
+//           // تحديث الحقول حسب النوع مع تقريب الأرقام
 //           if (isCompaniesView) {
-//             updatedMap['nolon'] =
-//                 double.tryParse(nolon) ?? item.transportation.nolon;
-//             updatedMap['companyOvernight'] =
-//                 double.tryParse(overnight) ??
-//                 item.transportation.companyOvernight;
-//             updatedMap['companyHoliday'] =
-//                 double.tryParse(holiday) ?? item.transportation.companyHoliday;
+//             double? nolonValue = double.tryParse(nolon);
+//             double? overnightValue = double.tryParse(overnight);
+//             double? holidayValue = double.tryParse(holiday);
+
+//             // تقريب الأرقام إلى رقم واحد بعد العلامة العشرية
+//             updatedMap['nolon'] = nolonValue != null
+//                 ? _roundToOneDecimal(nolonValue)
+//                 : item.transportation.nolon;
+
+//             updatedMap['companyOvernight'] = overnightValue != null
+//                 ? _roundToOneDecimal(overnightValue)
+//                 : item.transportation.companyOvernight;
+
+//             updatedMap['companyHoliday'] = holidayValue != null
+//                 ? _roundToOneDecimal(holidayValue)
+//                 : item.transportation.companyHoliday;
 //           } else {
-//             updatedMap['wheelNolon'] =
-//                 double.tryParse(nolon) ?? item.transportation.wheelNolon;
-//             updatedMap['wheelOvernight'] =
-//                 double.tryParse(overnight) ??
-//                 item.transportation.wheelOvernight;
-//             updatedMap['wheelHoliday'] =
-//                 double.tryParse(holiday) ?? item.transportation.wheelHoliday;
+//             double? nolonValue = double.tryParse(nolon);
+//             double? overnightValue = double.tryParse(overnight);
+//             double? holidayValue = double.tryParse(holiday);
+
+//             // تقريب الأرقام إلى رقم واحد بعد العلامة العشرية
+//             updatedMap['wheelNolon'] = nolonValue != null
+//                 ? _roundToOneDecimal(nolonValue)
+//                 : item.transportation.wheelNolon;
+
+//             updatedMap['wheelOvernight'] = overnightValue != null
+//                 ? _roundToOneDecimal(overnightValue)
+//                 : item.transportation.wheelOvernight;
+
+//             updatedMap['wheelHoliday'] = holidayValue != null
+//                 ? _roundToOneDecimal(holidayValue)
+//                 : item.transportation.wheelHoliday;
 //           }
 
 //           return updatedMap;
@@ -3327,7 +10066,7 @@
 //                 style: const TextStyle(color: Colors.grey),
 //               ),
 //               Text(
-//                 'النولون: ${item.transportation.nolon} ج',
+//                 'النولون: ${_formatNumber(item.transportation.nolon)} ج',
 //                 style: const TextStyle(color: Colors.grey),
 //               ),
 //               const SizedBox(height: 16),
@@ -3570,6 +10309,9 @@ import 'package:pdf/widgets.dart' as pdfLib;
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' as t;
+import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as path;
+import 'package:permission_handler/permission_handler.dart';
 
 class PriceOffersListScreen extends StatefulWidget {
   const PriceOffersListScreen({super.key});
@@ -3613,6 +10355,17 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
       debugPrint('تم تحميل الخط العربي بنجاح');
     } catch (e) {
       debugPrint('فشل تحميل الخط العربي: $e');
+    }
+  }
+
+  // دالة لطلب صلاحية التخزين
+  Future<bool> _requestStoragePermission() async {
+    if (await Permission.storage.request().isGranted) {
+      return true;
+    } else if (await Permission.manageExternalStorage.request().isGranted) {
+      return true;
+    } else {
+      return false;
     }
   }
 
@@ -3970,10 +10723,10 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // زر الطباعة
+                        // زر حفظ PDF
                         IconButton(
-                          icon: Icon(Icons.print, color: Colors.green[700]),
-                          onPressed: () => _generatePDF(),
+                          icon: Icon(Icons.save_alt, color: Colors.green[700]),
+                          onPressed: () => _generateAndSavePDF(),
                         ),
                         // زر الإغلاق
                         IconButton(
@@ -4108,9 +10861,9 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                     ),
                     const SizedBox(width: 10),
 
-                    // زر الطباعة
+                    // زر حفظ PDF
                     ElevatedButton(
-                      onPressed: () => _generatePDF(),
+                      onPressed: () => _generateAndSavePDF(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
@@ -4126,11 +10879,11 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                       child: Row(
                         children: [
                           Icon(
-                            Icons.print,
+                            Icons.save_alt,
                             color: const Color.fromARGB(255, 255, 255, 255),
                           ),
                           const SizedBox(width: 8),
-                          const Text('طباعة'),
+                          const Text('حفظ PDF'),
                         ],
                       ),
                     ),
@@ -4261,25 +11014,14 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                               const SizedBox(height: 2),
                               Text(
                                 keepNumbersAsIs
-                                    ? '✅ (10.5)زياده مع وجود كسور'
-                                    : '⬇️ (10)زياده مع الغاء كسور',
+                                    ? '✅ زيادة مع وجود كسور (مثال: 11.6 ← 11.6)'
+                                    : '⬇️ تقريب لأسفل (مثال: 11.6 ← 11)',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: keepNumbersAsIs
                                       ? Colors.green[700]
                                       : Colors.orange[700],
                                   fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                keepNumbersAsIs
-                                    ? 'مثال: = 11.6 → 11.606'
-                                    : 'مثال:= 11 → 11.51',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey[600],
-                                  fontStyle: FontStyle.italic,
                                 ),
                               ),
                             ],
@@ -4394,7 +11136,6 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
             if (updatedTransport['nolon'] != null) {
               double value =
                   (updatedTransport['nolon'] as num) * percentageFactor;
-              // ✅ تقريب الرقم إلى رقم واحد بعد العلامة العشرية
               double roundedValue = _roundToOneDecimal(value);
               updatedTransport['nolon'] = keepNumbersAsIs
                   ? roundedValue
@@ -4563,8 +11304,8 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
     );
   }
 
-  // ================= إنشاء PDF =================
-  Future<void> _generatePDF() async {
+  // ================= إنشاء وحفظ PDF =================
+  Future<void> _generateAndSavePDF() async {
     if (_arabicFont == null) {
       ScaffoldMessenger.of(
         context,
@@ -4574,25 +11315,59 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
 
     if (_currentCompanyName == null ||
         _currentViewType == null ||
-        _currentTransportations == null) {
+        _currentTransportations == null ||
+        _currentTransportations!.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للطباعة')));
+      ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للحفظ')));
       return;
     }
 
     setState(() => _isGeneratingPDF = true);
 
     try {
+      // طلب صلاحية التخزين
+      bool hasPermission = await _requestStoragePermission();
+      if (!hasPermission) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('صلاحية التخزين مطلوبة لحفظ الملف'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() => _isGeneratingPDF = false);
+        return;
+      }
+
+      // اختيار مجلد الحفظ
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'اختر مجلد لحفظ ملف PDF',
+      );
+
+      if (selectedDirectory == null) {
+        setState(() => _isGeneratingPDF = false);
+        return;
+      }
+
       // إنشاء PDF
       final pdf = pdfLib.Document(
         theme: pdfLib.ThemeData.withFont(base: _arabicFont!),
       );
 
-      // تقسيم البيانات إلى صفحات (25 صف لكل صفحة)
+      // تقسيم البيانات إلى صفحات
       final pages = _splitDataIntoPages(_currentTransportations!);
 
       for (int pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+        final currentPageData = pages[pageIndex];
+
+        // حساب رقم البداية الصحيح لهذه الصفحة
+        int startIndex = 0;
+        for (int i = 0; i < pageIndex; i++) {
+          startIndex += pages[i].length;
+        }
+
         pdf.addPage(
           pdfLib.Page(
             pageFormat: PdfPageFormat.a4,
@@ -4601,7 +11376,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
               return pdfLib.Column(
                 crossAxisAlignment: pdfLib.CrossAxisAlignment.stretch,
                 children: [
-                  // 1. الهيدر - أعلى الصفحة مباشرة
+                  // 1. الهيدر
                   _buildPdfHeader(),
                   pdfLib.SizedBox(height: 10),
 
@@ -4609,24 +11384,24 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                   _buildPdfTitle(),
                   pdfLib.SizedBox(height: 10),
 
-                  // 3. إحصائيات العدد
-                  _buildPdfStats(_currentTransportations!.length),
-                  pdfLib.SizedBox(height: 10),
+                  // 3. إحصائيات العدد (في الصفحة الأولى فقط)
+                  if (pageIndex == 0)
+                    _buildPdfStats(_currentTransportations!.length),
+                  if (pageIndex == 0) pdfLib.SizedBox(height: 10),
 
-                  // 4. الجدول - يأخذ المساحة المتبقية
+                  // 4. الجدول مع تمرير رقم البداية الصحيح
                   pdfLib.Expanded(
                     child: _currentViewType == 'companies'
                         ? _buildCompaniesPdfTablePage(
-                            pages[pageIndex],
-                            pageIndex,
+                            currentPageData,
+                            startIndex,
                           )
-                        : _buildWheelsPdfTablePage(pages[pageIndex], pageIndex),
+                        : _buildWheelsPdfTablePage(currentPageData, startIndex),
                   ),
 
-                  // 5. رقم الصفحة (إذا كان هناك أكثر من صفحة)
-                  if (pages.length > 1) pdfLib.SizedBox(height: 15),
-                  if (pages.length > 1)
-                    _buildPageNumber(pageIndex + 1, pages.length),
+                  // 5. رقم الصفحة
+                  pdfLib.SizedBox(height: 10),
+                  _buildPageNumber(pageIndex + 1, pages.length),
                 ],
               );
             },
@@ -4634,38 +11409,73 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
         );
       }
 
-      // طباعة PDF
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: _getPDFFileName(),
+      // حفظ PDF في الملف
+      final pdfBytes = await pdf.save();
+
+      // إنشاء اسم الملف
+      var fileName = '${_getPDFFileName()}.pdf';
+
+      final filePath = path.join(selectedDirectory, fileName);
+      if (!fileName.toLowerCase().endsWith('.pdf')) {
+        fileName = '$fileName.pdf';
+      }
+
+      // حفظ الملف
+      final file = await FilePicker.platform.saveFile(
+        dialogTitle: 'حفظ ملف PDF',
+        fileName: fileName,
+        initialDirectory: selectedDirectory,
+        bytes: pdfBytes,
       );
+
+      if (file != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '✅ تم حفظ الملف بنجاح\nعدد الصفوف: ${_currentTransportations!.length}\nعدد الصفحات: ${pages.length}',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('حدث خطأ في إنشاء PDF: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ حدث خطأ في حفظ PDF: $e')));
+      }
+      debugPrint('خطأ في حفظ PDF: $e');
     } finally {
       setState(() => _isGeneratingPDF = false);
     }
   }
 
-  // ================= تقسيم البيانات إلى صفحات =================
+  // ================= تقسيم البيانات إلى صفحات بشكل صحيح ودقيق =================
   List<List<TransportationWithOffer>> _splitDataIntoPages(
     List<TransportationWithOffer> transportations,
   ) {
     List<List<TransportationWithOffer>> pages = [];
-    List<TransportationWithOffer> currentPage = [];
 
-    // حوالي 25-30 صف لكل صفحة A4
-    int rowsPerPage = 25;
+    // عدد الصفوف في كل صفحة
+    const int rowsPerPage = 20;
 
-    for (int i = 0; i < transportations.length; i++) {
-      currentPage.add(transportations[i]);
-
-      // إذا وصلنا إلى العدد المحدد أو كانت آخر دفعة
-      if ((i + 1) % rowsPerPage == 0 || i == transportations.length - 1) {
-        pages.add(List.from(currentPage));
-        currentPage.clear();
+    for (int i = 0; i < transportations.length; i += rowsPerPage) {
+      int end = i + rowsPerPage;
+      if (end > transportations.length) {
+        end = transportations.length;
       }
+      pages.add(transportations.sublist(i, end));
+    }
+
+    // التحقق من صحة التقسيم
+    debugPrint('=== تقسيم الصفحات ===');
+    debugPrint('إجمالي الصفوف: ${transportations.length}');
+    debugPrint('عدد الصفحات: ${pages.length}');
+    for (int i = 0; i < pages.length; i++) {
+      debugPrint(
+        'الصفحة ${i + 1}: من ${i * rowsPerPage + 1} إلى ${i * rowsPerPage + pages[i].length} (عدد الصفوف: ${pages[i].length})',
+      );
     }
 
     return pages;
@@ -4708,7 +11518,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
       child: pdfLib.Column(
         children: [
           pdfLib.Text(
-            _currentCompanyName!,
+            _currentCompanyName ?? 'غير معروف',
             style: pdfLib.TextStyle(
               fontSize: 16,
               fontWeight: pdfLib.FontWeight.bold,
@@ -4747,7 +11557,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
               ),
             ),
             pdfLib.Text(
-              '$total',
+              total.toString(),
               style: pdfLib.TextStyle(
                 fontSize: 16,
                 fontWeight: pdfLib.FontWeight.bold,
@@ -4763,20 +11573,20 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
   // ================= بناء جدول الشركات للصفحة =================
   pdfLib.Widget _buildCompaniesPdfTablePage(
     List<TransportationWithOffer> transportations,
-    int pageIndex,
+    int startIndex,
   ) {
     return pdfLib.Directionality(
       textDirection: pdfLib.TextDirection.rtl,
       child: pdfLib.Table(
         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
         columnWidths: {
-          6: pdfLib.FlexColumnWidth(0.4), // م
-          5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
-          4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
-          3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
-          2: pdfLib.FlexColumnWidth(1.0), // النولون
-          1: pdfLib.FlexColumnWidth(1.0), // المبيت
-          0: pdfLib.FlexColumnWidth(1.0), // العطلة
+          6: pdfLib.FlexColumnWidth(0.5), // م
+          5: pdfLib.FlexColumnWidth(2.0), // مكان التحميل
+          4: pdfLib.FlexColumnWidth(2.0), // مكان التعتيق
+          3: pdfLib.FlexColumnWidth(1.5), // نوع العربية
+          2: pdfLib.FlexColumnWidth(1.2), // النولون
+          1: pdfLib.FlexColumnWidth(1.2), // المبيت
+          0: pdfLib.FlexColumnWidth(1.2), // العطلة
         },
         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
         children: [
@@ -4786,17 +11596,23 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
             children: [
               _buildCompactHeaderCell('العطلة'),
               _buildCompactHeaderCell('المبيت'),
+
               _buildCompactHeaderCell('النولون'),
+
               _buildCompactHeaderCell('نوع العربية'),
+
               _buildCompactHeaderCell('مكان التعتيق'),
+
               _buildCompactHeaderCell('مكان التحميل'),
+
               _buildCompactHeaderCell('م'),
             ],
           ),
 
           // بيانات الجدول
           ...transportations.asMap().entries.map((entry) {
-            int index = (pageIndex * 25) + entry.key + 1;
+            // الرقم المسلسل الصحيح = startIndex + رقم العنصر في الصفحة + 1
+            int index = startIndex + entry.key + 1;
             final item = entry.value;
             final transport = item.transportation;
 
@@ -4806,19 +11622,23 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
               children: [
                 _buildCompactDataCell(
-                  '${_formatPdfNumber(transport.companyHoliday)}',
+                  _formatPdfNumber(transport.companyHoliday),
                 ),
                 _buildCompactDataCell(
-                  '${_formatPdfNumber(transport.companyOvernight)}',
+                  _formatPdfNumber(transport.companyOvernight),
                 ),
-                _buildCompactDataCell('${_formatPdfNumber(transport.nolon)}'),
+                _buildCompactDataCell(_formatPdfNumber(transport.nolon)),
+
                 _buildCompactDataCell(transport.vehicleType),
+
                 _buildCompactDataCell(transport.unloadingLocation),
+
                 _buildCompactDataCell(transport.loadingLocation),
+
                 _buildCompactDataCell(index.toString()),
               ],
             );
-          }),
+          }).toList(),
         ],
       ),
     );
@@ -4827,20 +11647,20 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
   // ================= بناء جدول العجل للصفحة =================
   pdfLib.Widget _buildWheelsPdfTablePage(
     List<TransportationWithOffer> transportations,
-    int pageIndex,
+    int startIndex,
   ) {
     return pdfLib.Directionality(
       textDirection: pdfLib.TextDirection.rtl,
       child: pdfLib.Table(
         border: pdfLib.TableBorder.all(color: PdfColors.black, width: 1),
         columnWidths: {
-          6: pdfLib.FlexColumnWidth(0.4), // م
-          5: pdfLib.FlexColumnWidth(1.8), // مكان التحميل
-          4: pdfLib.FlexColumnWidth(1.8), // مكان التعتيق
-          3: pdfLib.FlexColumnWidth(1.2), // نوع العربية
-          2: pdfLib.FlexColumnWidth(1.0), // النولون
-          1: pdfLib.FlexColumnWidth(1.0), // المبيت
-          0: pdfLib.FlexColumnWidth(1.0), // العطلة
+          0: pdfLib.FlexColumnWidth(0.5), // م
+          1: pdfLib.FlexColumnWidth(2.0), // مكان التحميل
+          2: pdfLib.FlexColumnWidth(2.0), // مكان التعتيق
+          3: pdfLib.FlexColumnWidth(1.5), // نوع العربية
+          4: pdfLib.FlexColumnWidth(1.2), // النولون
+          5: pdfLib.FlexColumnWidth(1.2), // المبيت
+          6: pdfLib.FlexColumnWidth(1.2), // العطلة
         },
         defaultVerticalAlignment: pdfLib.TableCellVerticalAlignment.middle,
         children: [
@@ -4848,19 +11668,20 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
           pdfLib.TableRow(
             decoration: pdfLib.BoxDecoration(color: PdfColors.grey200),
             children: [
-              _buildCompactHeaderCell('العطلة'),
-              _buildCompactHeaderCell('المبيت'),
-              _buildCompactHeaderCell('النولون'),
-              _buildCompactHeaderCell('نوع العربية'),
-              _buildCompactHeaderCell('مكان التعتيق'),
-              _buildCompactHeaderCell('مكان التحميل'),
               _buildCompactHeaderCell('م'),
+              _buildCompactHeaderCell('مكان التحميل'),
+              _buildCompactHeaderCell('مكان التعتيق'),
+              _buildCompactHeaderCell('نوع العربية'),
+              _buildCompactHeaderCell('النولون'),
+              _buildCompactHeaderCell('المبيت'),
+              _buildCompactHeaderCell('العطلة'),
             ],
           ),
 
           // بيانات الجدول
           ...transportations.asMap().entries.map((entry) {
-            int index = (pageIndex * 25) + entry.key + 1;
+            // الرقم المسلسل الصحيح = startIndex + رقم العنصر في الصفحة + 1
+            int index = startIndex + entry.key + 1;
             final item = entry.value;
             final transport = item.transportation;
 
@@ -4869,38 +11690,49 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                   ? pdfLib.BoxDecoration(color: PdfColors.white)
                   : pdfLib.BoxDecoration(color: PdfColors.grey100),
               children: [
-                _buildCompactDataCell(
-                  '${_formatPdfNumber(transport.wheelHoliday)}',
-                ),
-                _buildCompactDataCell(
-                  '${_formatPdfNumber(transport.wheelOvernight)}',
-                ),
-                _buildCompactDataCell(
-                  '${_formatPdfNumber(transport.wheelNolon)}',
-                ),
-                _buildCompactDataCell(transport.vehicleType),
-                _buildCompactDataCell(transport.unloadingLocation),
-                _buildCompactDataCell(transport.loadingLocation),
                 _buildCompactDataCell(index.toString()),
+                _buildCompactDataCell(transport.loadingLocation),
+                _buildCompactDataCell(transport.unloadingLocation),
+                _buildCompactDataCell(transport.vehicleType),
+                _buildCompactDataCell(_formatPdfNumber(transport.wheelNolon)),
+                _buildCompactDataCell(
+                  _formatPdfNumber(transport.wheelOvernight),
+                ),
+                _buildCompactDataCell(_formatPdfNumber(transport.wheelHoliday)),
               ],
             );
-          }),
+          }).toList(),
         ],
       ),
     );
   }
 
-  // دالة لتنسيق الأرقام في PDF برقم واحد بعد العلامة العشرية
-  String _formatPdfNumber(double? number) {
+  // دالة لتنسيق الأرقام في PDF
+  String _formatPdfNumber(dynamic number) {
     if (number == null) return '0';
 
-    // إذا كان الرقم صحيحًا
-    if (number == number.roundToDouble()) {
-      return number.round().toString();
+    // تحويل إلى double إذا كان الرقم ليس رقمياً
+    double numValue;
+    if (number is double) {
+      numValue = number;
+    } else if (number is int) {
+      numValue = number.toDouble();
+    } else {
+      // محاولة تحويل النص إلى رقم
+      try {
+        numValue = double.parse(number.toString());
+      } catch (e) {
+        return '0';
+      }
+    }
+
+    // إذا كان الرقم صحيحًا (بدون كسور)
+    if (numValue == numValue.roundToDouble()) {
+      return numValue.round().toString();
     }
 
     // عرض برقم واحد بعد العلامة العشرية
-    return number.toStringAsFixed(1);
+    return numValue.toStringAsFixed(1);
   }
 
   // ================= بناء خلية رأس مضغوطة =================
@@ -4917,6 +11749,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
         ),
         textAlign: pdfLib.TextAlign.center,
         maxLines: 2,
+        overflow: pdfLib.TextOverflow.visible,
       ),
     );
   }
@@ -4934,6 +11767,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
         ),
         textAlign: pdfLib.TextAlign.center,
         maxLines: 2,
+        overflow: pdfLib.TextOverflow.visible,
       ),
     );
   }
@@ -4959,22 +11793,33 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
   // ================= الحصول على اسم الملف =================
   String _getPDFFileName() {
     final now = DateTime.now();
-    final formattedDate = DateFormat('yyyyMMdd').format(now);
+    final formattedDate = DateFormat('yyyyMMdd_HHmmss').format(now);
     final viewTypeText = _currentViewType == 'companies' ? 'شركات' : 'عجل';
     return 'عروض_اسعار_${viewTypeText}_${_currentCompanyName}_$formattedDate';
   }
 
-  // دالة لتنسيق الأرقام برقم واحد بعد العلامة العشرية
-  String _formatNumber(double? number) {
+  // دالة لتنسيق الأرقام للعرض في الواجهة
+  String _formatNumber(dynamic number) {
     if (number == null) return '0';
 
-    // إذا كان الرقم صحيحًا (بدون كسور)
-    if (number == number.roundToDouble()) {
-      return number.round().toString();
+    double numValue;
+    if (number is double) {
+      numValue = number;
+    } else if (number is int) {
+      numValue = number.toDouble();
+    } else {
+      try {
+        numValue = double.parse(number.toString());
+      } catch (e) {
+        return '0';
+      }
     }
 
-    // تقريب الرقم إلى رقم واحد بعد العلامة العشرية للعرض فقط
-    return number.toStringAsFixed(1);
+    if (numValue == numValue.roundToDouble()) {
+      return numValue.round().toString();
+    }
+
+    return numValue.toStringAsFixed(1);
   }
 
   Widget _buildCompaniesTable(List<TransportationWithOffer> transportations) {
@@ -4991,7 +11836,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
             defaultColumnWidth: const FixedColumnWidth(150),
             border: TableBorder.all(color: const Color(0xFF3498DB), width: 1),
             children: [
-              /// ✅ العناوين - جدول الشركات
+              /// العناوين - جدول الشركات
               TableRow(
                 decoration: BoxDecoration(
                   color: const Color(0xFF3498DB).withOpacity(0.15),
@@ -5008,7 +11853,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                 ],
               ),
 
-              /// ✅ الصفوف - جدول الشركات
+              /// الصفوف - جدول الشركات
               ...transportations.asMap().entries.map((entry) {
                 final index = entry.key;
                 final item = entry.value;
@@ -5060,7 +11905,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
             defaultColumnWidth: const FixedColumnWidth(150),
             border: TableBorder.all(color: const Color(0xFF6A1B9A), width: 1),
             children: [
-              /// ✅ العناوين - جدول العجل
+              /// العناوين - جدول العجل
               TableRow(
                 decoration: BoxDecoration(
                   color: const Color(0xFF6A1B9A).withOpacity(0.15),
@@ -5077,7 +11922,7 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
                 ],
               ),
 
-              /// ✅ الصفوف - جدول العجل
+              /// الصفوف - جدول العجل
               ...transportations.asMap().entries.map((entry) {
                 final index = entry.key;
                 final item = entry.value;
@@ -5413,7 +12258,6 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
             double? overnightValue = double.tryParse(overnight);
             double? holidayValue = double.tryParse(holiday);
 
-            // ✅ تقريب الأرقام إلى رقم واحد بعد العلامة العشرية
             updatedMap['nolon'] = nolonValue != null
                 ? _roundToOneDecimal(nolonValue)
                 : item.transportation.nolon;
@@ -5430,7 +12274,6 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
             double? overnightValue = double.tryParse(overnight);
             double? holidayValue = double.tryParse(holiday);
 
-            // ✅ تقريب الأرقام إلى رقم واحد بعد العلامة العشرية
             updatedMap['wheelNolon'] = nolonValue != null
                 ? _roundToOneDecimal(nolonValue)
                 : item.transportation.wheelNolon;
@@ -5455,7 +12298,6 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
         'updatedAt': Timestamp.now(),
       });
 
-      // إظهار رسالة نجاح
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -5592,7 +12434,6 @@ class _PriceOffersListScreenState extends State<PriceOffersListScreen> {
         });
       }
 
-      // إظهار رسالة نجاح
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

@@ -10,8 +10,10 @@ import 'package:last/screens/1section/month_history.dart';
 import 'package:last/screens/3section/Taxes_page.dart';
 import 'package:last/screens/3section/company_partners.dart';
 import 'package:last/screens/3section/kazna/kazna_home.dart';
+import 'package:last/screens/3section/login.dart';
 import 'package:last/screens/3section/mony_head.dart';
 import 'package:last/screens/3section/nasriat.dart';
+import 'package:last/screens/3section/passwod.dart';
 import 'package:last/screens/3section/sallaff.dart';
 import 'screens/1section/company.dart';
 import 'screens/1section/prices.dart';
@@ -34,7 +36,7 @@ class ShippingCompanyApp extends StatelessWidget {
         fontFamily: 'Cairo',
         useMaterial3: true,
       ),
-      home: Splash(),
+      home: LoginPage(),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -64,6 +66,7 @@ class _MainDashboardState extends State<MainDashboard> {
     TaxesPage(), // الملخص الشهري
     MonthlyProfitsPage(),
     CapitalManagementPage(),
+    ChangePasswordPage(),
 
     // الدائنون والمدينون
   ];
@@ -85,6 +88,7 @@ class _MainDashboardState extends State<MainDashboard> {
     'الارباج  ',
 
     'راس مال الشركه ',
+    'تغيير كلمة السر',
   ];
 
   final List<IconData> _pageIcons = [
@@ -103,6 +107,7 @@ class _MainDashboardState extends State<MainDashboard> {
     Icons.summarize,
     Icons.swap_horiz,
     Icons.money,
+    Icons.password,
   ];
 
   // للتحكم في فتح وإغلاق الـ drawer في الشاشات الصغيرة
